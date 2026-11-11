@@ -242,7 +242,7 @@ export function computeSkillMatch(
 ): SkillMatchBreakdown {
   const activeProfile = profile || SACHILA_CV_PROFILE;
   const cvSkills =
-    activeProfile.skills && activeProfile.skills.length > 0
+    Array.isArray(activeProfile?.skills) && activeProfile.skills.length > 0
       ? activeProfile.skills
       : CV_SKILLS;
 
@@ -260,7 +260,10 @@ export function computeSkillMatch(
   // 1. Detect Matched CV Skills
   const matchedSkills: CVSkill[] = [];
   for (const skill of cvSkills) {
-    const isMatched = skill.aliases.some((alias) =>
+    const aliases = Array.isArray(skill.aliases) && skill.aliases.length > 0
+      ? skill.aliases
+      : [skill.name];
+    const isMatched = aliases.some((alias) =>
       containsTerm(searchableText, alias)
     );
     if (isMatched) {
@@ -269,19 +272,24 @@ export function computeSkillMatch(
   }
 
   // Sort matched skills by weight descending
-  matchedSkills.sort((a, b) => b.weight - a.weight);
+  matchedSkills.sort((a, b) => (b.weight || 5) - (a.weight || 5));
 
   // 2. Detect Missing / Stretch Skills mentioned in the job
   const missingSkillsSet = new Set<string>();
   for (const nonCvSkill of NON_CV_TECH_KEYWORDS) {
-    const isPresent = nonCvSkill.aliases.some((alias) =>
+    const isPresent = (nonCvSkill.aliases || []).some((alias) =>
       containsTerm(searchableText, alias)
     );
     if (isPresent) {
       // Don't mark as missing if the active profile already has this skill
-      const coveredInProfile = cvSkills.some((s) =>
-        s.aliases.some((a) => a.toLowerCase() === nonCvSkill.name.toLowerCase())
-      );
+      const coveredInProfile = cvSkills.some((s) => {
+        const sAliases = Array.isArray(s.aliases) && s.aliases.length > 0
+          ? s.aliases
+          : [s.name];
+        return sAliases.some(
+          (a) => a.toLowerCase() === nonCvSkill.name.toLowerCase()
+        );
+      });
       if (!coveredInProfile) {
         missingSkillsSet.add(nonCvSkill.name);
       }
@@ -289,13 +297,17 @@ export function computeSkillMatch(
   }
 
   // Also check if job has explicit requiredKeywords not covered by profile skills
-  if (job.requiredKeywords) {
+  if (job.requiredKeywords && Array.isArray(job.requiredKeywords)) {
     for (const kw of job.requiredKeywords) {
-      const coveredByCv = cvSkills.some(
-        (s) =>
+      const coveredByCv = cvSkills.some((s) => {
+        const sAliases = Array.isArray(s.aliases) && s.aliases.length > 0
+          ? s.aliases
+          : [s.name];
+        return (
           s.name.toLowerCase() === kw.toLowerCase() ||
-          s.aliases.some((a) => a.toLowerCase() === kw.toLowerCase())
-      );
+          sAliases.some((a) => a.toLowerCase() === kw.toLowerCase())
+        );
+      });
       if (!coveredByCv) {
         missingSkillsSet.add(kw);
       }
@@ -309,7 +321,7 @@ export function computeSkillMatch(
   
   // Top 5-6 pillar skills from profile
   const sortedPillars = [...cvSkills]
-    .sort((a, b) => b.weight - a.weight)
+    .sort((a, b) => (b.weight || 5) - (a.weight || 5))
     .slice(0, 6)
     .map((s) => s.id);
   const matchedCoreCount = sortedPillars.filter((id) => matchedIds.has(id)).length;
@@ -319,7 +331,7 @@ export function computeSkillMatch(
     totalDetectedSkills > 0 ? matchedSkills.length / totalDetectedSkills : 0.7;
 
   // Tech stack score (0-100)
-  const weightedSum = matchedSkills.reduce((acc, s) => acc + s.weight, 0);
+  const weightedSum = matchedSkills.reduce((acc, s) => acc + (s.weight || 5), 0);
   const baseStackScore = Math.min(
     100,
     Math.round(rawCoverageRatio * 72 + Math.min(28, weightedSum * 0.45))
@@ -342,12 +354,16 @@ export function computeSkillMatch(
   }
 
   // Role track affinity
-  const targetTrack = activeProfile.targetRoleTrack;
+  const targetTrack = activeProfile?.targetRoleTrack;
   const inferred = inferRoleTrack(job.title, job.description);
-  if (inferred === targetTrack) {
+  const primaryKeywords = Array.isArray(activeProfile?.primarySearchKeywords)
+    ? activeProfile.primarySearchKeywords
+    : [];
+
+  if (targetTrack && inferred === targetTrack) {
     roleSeniorityScore += 10;
   } else if (
-    activeProfile.primarySearchKeywords.some((kw) =>
+    primaryKeywords.some((kw) =>
       titleLower.includes(kw.toLowerCase())
     )
   ) {
@@ -436,17 +452,19 @@ export function computeSkillMatch(
   } else {
     // Dynamic Evidence Generation for any uploaded/selected CV Profile
     // 1. Check experience alignment
-    if (activeProfile.experience && activeProfile.experience.length > 0) {
+    if (Array.isArray(activeProfile?.experience) && activeProfile.experience.length > 0) {
       let bestExp = activeProfile.experience[0];
       let bestMatchCount = 0;
 
       for (const exp of activeProfile.experience) {
-        const expText = `${exp.role} ${exp.company} ${exp.highlights.join(
-          ' '
-        )}`.toLowerCase();
-        const count = matchedSkills.filter((s) =>
-          s.aliases.some((a) => expText.includes(a.toLowerCase()))
-        ).length;
+        const highlightsText = Array.isArray(exp.highlights) ? exp.highlights.join(' ') : '';
+        const expText = `${exp.role || ''} ${exp.company || ''} ${highlightsText}`.toLowerCase();
+        const count = matchedSkills.filter((s) => {
+          const sAliases = Array.isArray(s.aliases) && s.aliases.length > 0
+            ? s.aliases
+            : [s.name];
+          return sAliases.some((a) => expText.includes(a.toLowerCase()));
+        }).length;
         if (count > bestMatchCount) {
           bestMatchCount = count;
           bestExp = exp;
@@ -454,14 +472,15 @@ export function computeSkillMatch(
       }
 
       if (bestExp) {
+        const periodStr = bestExp.period ? ` (${bestExp.period})` : '';
         cvEvidenceReasons.push(
-          `Strong role synergy with your experience as ${bestExp.role} at ${bestExp.company} (${bestExp.period}) leveraging ${matchedSkills.slice(0, 3).map((s) => s.name).join(', ')}.`
+          `Strong role synergy with your experience as ${bestExp.role} at ${bestExp.company}${periodStr} leveraging ${matchedSkills.slice(0, 3).map((s) => s.name).join(', ')}.`
         );
       }
     }
 
     // 2. Check certification alignment
-    if (activeProfile.certifications && activeProfile.certifications.length > 0) {
+    if (Array.isArray(activeProfile?.certifications) && activeProfile.certifications.length > 0) {
       const topCert = activeProfile.certifications[0];
       const certTime = topCert.year || topCert.date ? ` (${topCert.year || topCert.date})` : '';
       cvEvidenceReasons.push(
@@ -470,7 +489,7 @@ export function computeSkillMatch(
     }
 
     // 3. Check education alignment
-    if (activeProfile.education && activeProfile.education.length > 0) {
+    if (Array.isArray(activeProfile?.education) && activeProfile.education.length > 0) {
       const topEdu = activeProfile.education[0];
       cvEvidenceReasons.push(
         `Supported by your ${topEdu.degree} from ${topEdu.institution}.`
@@ -479,11 +498,13 @@ export function computeSkillMatch(
   }
 
   if (cvEvidenceReasons.length === 0) {
+    const years = activeProfile?.yearsOfExperience || 5;
+    const title = activeProfile?.title || 'Software Engineer';
     cvEvidenceReasons.push(
       `Matches ${matchedSkills.length} verified competencies (${matchedSkills
         .slice(0, 4)
         .map((s) => s.name)
-        .join(', ')}) from your ${activeProfile.yearsOfExperience}+ years ${activeProfile.title} background.`
+        .join(', ')}) from your ${years}+ years ${title} background.`
     );
   }
 

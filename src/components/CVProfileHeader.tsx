@@ -319,7 +319,7 @@ export const CVProfileHeader: React.FC<CVProfileHeaderProps> = ({
             </div>
 
             <div className="mt-4 grid gap-4 md:grid-cols-3">
-              {profile.experience.map((exp) => (
+              {(profile.experience || []).map((exp) => (
                 <div
                   key={`${exp.company}-${exp.period}`}
                   className="rounded-lg border border-[#E5E0D8] bg-[#FAF8F5] p-3.5 dark:border-[#1F2230] dark:bg-[#090A0F]"
@@ -336,7 +336,7 @@ export const CVProfileHeader: React.FC<CVProfileHeaderProps> = ({
                     {exp.company} • {exp.location}
                   </div>
                   <ul className="mt-2.5 space-y-1.5 text-xs text-[#44403C] dark:text-zinc-300">
-                    {exp.highlights.map((h, i) => (
+                    {(exp.highlights || []).map((h, i) => (
                       <li key={i} className="leading-relaxed">
                         • {h}
                       </li>
@@ -352,7 +352,7 @@ export const CVProfileHeader: React.FC<CVProfileHeaderProps> = ({
                 <Sparkles className="h-3.5 w-3.5 text-[#0F766E]" />
                 {profile.name}&apos;s CV Skills:
               </span>
-              {profile.skills.map((skill) => {
+              {(profile.skills || []).map((skill) => {
                 const isSelected = selectedSkillFilter === skill.name;
                 return (
                   <button

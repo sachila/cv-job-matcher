@@ -178,8 +178,8 @@ export function App() {
       // Reset skill filter if not present in new profile
       if (
         selectedSkillFilter &&
-        !newProfile.skills.some(
-          (s) => s.name.toLowerCase() === selectedSkillFilter.toLowerCase()
+        !(newProfile?.skills || []).some(
+          (s) => s.name?.toLowerCase() === selectedSkillFilter.toLowerCase()
         )
       ) {
         setSelectedSkillFilter(null);
@@ -252,7 +252,7 @@ export function App() {
       if (q) {
         const hay = `${job.title} ${job.company} ${job.location} ${job.source} ${job.description} ${
           job.visaSponsorshipNote || ''
-        } ${job.match.matchedSkills.map((s) => s.name).join(' ')}`.toLowerCase();
+        } ${(job.match?.matchedSkills || []).map((s) => s.name).join(' ')}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
 
@@ -275,13 +275,13 @@ export function App() {
       }
 
       // Minimum Match % Filter
-      if (job.match.overallScore < minMatchScore) {
+      if ((job.match?.overallScore || 0) < minMatchScore) {
         return false;
       }
 
       // Specific CV Skill Pill Filter
       if (selectedSkillFilter) {
-        const hasSkill = job.match.matchedSkills.some(
+        const hasSkill = (job.match?.matchedSkills || []).some(
           (s) => s.name.toLowerCase() === selectedSkillFilter.toLowerCase()
         );
         if (!hasSkill) return false;
@@ -658,7 +658,7 @@ export function App() {
                   <div className="flex items-center justify-between">
                     <span className="inline-flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-[#78716C] dark:text-zinc-400">
                       <Sparkles className="h-3.5 w-3.5 text-[#0F766E] dark:text-emerald-400" />
-                      {activeProfile.name.split(' ')[0]}&apos;s CV Skills
+                      {(activeProfile?.name || 'Candidate').split(' ')[0]}&apos;s CV Skills
                     </span>
                     {selectedSkillFilter && (
                       <button
@@ -672,7 +672,7 @@ export function App() {
                   </div>
 
                   <div className="mt-2 flex flex-wrap gap-1.5 max-h-48 overflow-y-auto">
-                    {activeProfile.skills.map((skill) => {
+                    {(activeProfile?.skills || []).map((skill) => {
                       const isSelected = selectedSkillFilter === skill.name;
                       return (
                         <button
