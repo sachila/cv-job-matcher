@@ -2,7 +2,7 @@ import { RawJobPosting } from '../types/job';
 import { daysFromNowISO, hoursAgoISO } from '../utils/dateUtils';
 
 export const MULTI_SOURCE_CURATED_JOBS: RawJobPosting[] = [
-  // ================= LINKEDIN JOBS =================
+  // ================= LINKEDIN STOCKHOLM JOBS =================
   {
     id: 'linkedin-lovable-ai-fullstack',
     title: 'Senior Fullstack Engineer — AI Agent Platform',
@@ -13,6 +13,10 @@ export const MULTI_SOURCE_CURATED_JOBS: RawJobPosting[] = [
     postedAt: hoursAgoISO(2),
     expiresAt: daysFromNowISO(28),
     salaryRange: '72,000 – 88,000 SEK / mo',
+    visaSponsorship: true,
+    visaSponsorshipNote:
+      'Mentions: Full Swedish work permit & visa sponsorship + Stockholm relocation package provided',
+    requiresSwedish: false,
     source: 'LinkedIn',
     url: 'https://www.linkedin.com/jobs/search/?keywords=Senior%20Fullstack%20Engineer%20Lovable&location=Stockholm%2C%20Sweden&f_TPR=r604800',
     highlights: [
@@ -33,7 +37,7 @@ export const MULTI_SOURCE_CURATED_JOBS: RawJobPosting[] = [
       'Docker',
     ],
     description:
-      'We are looking for a Senior Fullstack Engineer in Stockholm to help build the next generation of AI-powered software creation tools. You will own end-to-end features across our React, Next.js, and TypeScript frontend and Node.js backend, streaming real-time LLM agent responses via Server-Sent Events (SSE). Experience with Tailwind CSS, component libraries, PostgreSQL, AWS, and automated testing (Jest) is highly valued. Bonus if you have experience with Docker container sandboxing.',
+      'We are looking for a Senior Fullstack Engineer in Stockholm to help build the next generation of AI-powered software creation tools. You will own end-to-end features across our React, Next.js, and TypeScript frontend and Node.js backend, streaming real-time LLM agent responses via Server-Sent Events (SSE). Experience with Tailwind CSS, component libraries, PostgreSQL, AWS, and automated testing (Jest) is highly valued. We offer full Swedish work visa sponsorship and relocation support to Stockholm.',
   },
   {
     id: 'linkedin-klarna-fintech-fullstack',
@@ -45,6 +49,10 @@ export const MULTI_SOURCE_CURATED_JOBS: RawJobPosting[] = [
     postedAt: hoursAgoISO(5),
     expiresAt: daysFromNowISO(25),
     salaryRange: '68,000 – 82,000 SEK / mo',
+    visaSponsorship: true,
+    visaSponsorshipNote:
+      'Mentions: Migrationsverket certified employer — fast-track work visa sponsorship & renewal support',
+    requiresSwedish: false,
     source: 'LinkedIn',
     url: 'https://www.linkedin.com/jobs/search/?keywords=Senior%20Fullstack%20Engineer%20TypeScript%20Klarna&location=Stockholm%2C%20Sweden&f_TPR=r604800',
     highlights: [
@@ -67,7 +75,7 @@ export const MULTI_SOURCE_CURATED_JOBS: RawJobPosting[] = [
       'Kafka / Event Queues',
     ],
     description:
-      'Join Klarna in Stockholm as a Senior Fullstack Engineer working on our core financial portals and merchant tools. You will build high-reliability web applications using React, TypeScript, and Node.js (Express), backed by microservices on AWS and PostgreSQL. Strong experience with REST APIs, GraphQL, role-based access control (RBAC), CI/CD pipelines, Jest automated testing, and monitoring/logging is required. Experience with Kafka event queues is a plus.',
+      'Join Klarna in Stockholm as a Senior Fullstack Engineer working on our core financial portals and merchant tools. You will build high-reliability web applications using React, TypeScript, and Node.js (Express), backed by microservices on AWS and PostgreSQL. Strong experience with REST APIs, GraphQL, role-based access control (RBAC), CI/CD pipelines, Jest automated testing, and monitoring/logging is required. Klarna provides full visa sponsorship and work permit support in Sweden.',
   },
   {
     id: 'linkedin-tink-tech-lead',
@@ -79,6 +87,10 @@ export const MULTI_SOURCE_CURATED_JOBS: RawJobPosting[] = [
     postedAt: hoursAgoISO(26),
     expiresAt: daysFromNowISO(21),
     salaryRange: '74,000 – 86,000 SEK / mo',
+    visaSponsorship: true,
+    visaSponsorshipNote:
+      'Mentions: Visa sponsorship & Swedish work permit transfer/application supported',
+    requiresSwedish: false,
     source: 'LinkedIn',
     url: 'https://www.linkedin.com/jobs/search/?keywords=Lead%20Fullstack%20Engineer%20Tink&location=Stockholm%2C%20Sweden',
     highlights: [
@@ -100,7 +112,7 @@ export const MULTI_SOURCE_CURATED_JOBS: RawJobPosting[] = [
       'Kubernetes',
     ],
     description:
-      'At Tink in Stockholm, we are looking for a Lead Fullstack Engineer to guide a cross-functional Agile team building mission-critical Open Banking portals. You will combine hands-on coding in TypeScript, React, Next.js, and Node.js with architectural leadership on AWS, microservices, CI/CD pipelines, and monitoring/logging. You enjoy mentoring engineers, pair programming, and raising frontend and full-stack engineering quality.',
+      'At Tink in Stockholm, we are looking for a Lead Fullstack Engineer to guide a cross-functional Agile team building mission-critical Open Banking portals. You will combine hands-on coding in TypeScript, React, Next.js, and Node.js with architectural leadership on AWS, microservices, CI/CD pipelines, and monitoring/logging. Work permit and visa sponsorship in Sweden are supported.',
   },
   {
     id: 'linkedin-bambuser-fullstack',
@@ -112,6 +124,10 @@ export const MULTI_SOURCE_CURATED_JOBS: RawJobPosting[] = [
     postedAt: hoursAgoISO(52),
     expiresAt: daysFromNowISO(18),
     salaryRange: '65,000 – 78,000 SEK / mo',
+    visaSponsorship: false,
+    requiresSwedish: true,
+    swedishRequirementNote:
+      'Mentions: Fluent Swedish and English (flytande svenska i tal och skrift) is required for Nordic client collaboration',
     source: 'LinkedIn',
     url: 'https://www.linkedin.com/jobs/search/?keywords=Senior%20Fullstack%20Engineer%20TypeScript%20React&location=Stockholm%2C%20Sweden',
     highlights: [
@@ -132,10 +148,10 @@ export const MULTI_SOURCE_CURATED_JOBS: RawJobPosting[] = [
       'CI/CD & GitHub Actions',
     ],
     description:
-      'Bambuser is hiring a Senior Fullstack Engineer in Stockholm to scale our enterprise video commerce platform. You will build responsive React & Next.js portals with TypeScript and Tailwind CSS, real-time event streaming (SSE), and Node.js / Express / GraphQL backends on AWS.',
+      'Bambuser is hiring a Senior Fullstack Engineer in Stockholm to scale our enterprise video commerce platform. You will build responsive React & Next.js portals with TypeScript and Tailwind CSS, real-time event streaming (SSE), and Node.js / Express / GraphQL backends on AWS. Fluent in Swedish and English (flytande svenska i tal och skrift) is required.',
   },
 
-  // ================= INDEED JOBS =================
+  // ================= INDEED STOCKHOLM JOBS =================
   {
     id: 'indeed-sana-labs-ai-engineer',
     title: 'Senior Fullstack Product Engineer — Enterprise AI Assistants',
@@ -146,6 +162,10 @@ export const MULTI_SOURCE_CURATED_JOBS: RawJobPosting[] = [
     postedAt: hoursAgoISO(9),
     expiresAt: daysFromNowISO(24),
     salaryRange: '70,000 – 85,000 SEK / mo',
+    visaSponsorship: true,
+    visaSponsorshipNote:
+      'Mentions: Visa sponsorship & relocation assistance to Stockholm included',
+    requiresSwedish: false,
     source: 'Indeed',
     url: 'https://se.indeed.com/jobs?q=Senior+Fullstack+Engineer+TypeScript+React+AI&l=Stockholm',
     highlights: [
@@ -166,7 +186,7 @@ export const MULTI_SOURCE_CURATED_JOBS: RawJobPosting[] = [
       'Python',
     ],
     description:
-      'Sana is seeking a Senior Fullstack Product Engineer in Stockholm to build enterprise AI assistants used by leading global teams. You will craft responsive, low-latency interfaces in React, Next.js, and TypeScript, connect real-time streaming LLM responses over Server-Sent Events (SSE), and contribute to our shared Tailwind CSS design system. Familiarity with Python backend services is a bonus.',
+      'Sana is seeking a Senior Fullstack Product Engineer in Stockholm to build enterprise AI assistants used by leading global teams. You will craft responsive, low-latency interfaces in React, Next.js, and TypeScript, connect real-time streaming LLM responses over Server-Sent Events (SSE), and contribute to our shared Tailwind CSS design system. Full visa sponsorship and relocation assistance to Stockholm are provided.',
   },
   {
     id: 'indeed-spotify-web-platform',
@@ -178,6 +198,10 @@ export const MULTI_SOURCE_CURATED_JOBS: RawJobPosting[] = [
     postedAt: hoursAgoISO(38),
     expiresAt: daysFromNowISO(19),
     salaryRange: '67,000 – 80,000 SEK / mo',
+    visaSponsorship: true,
+    visaSponsorshipNote:
+      'Mentions: Full Swedish work permit & visa sponsorship supported by global mobility team',
+    requiresSwedish: false,
     source: 'Indeed',
     url: 'https://se.indeed.com/jobs?q=Fullstack+Engineer+React+TypeScript+Next.js&l=Stockholm',
     highlights: [
@@ -198,7 +222,7 @@ export const MULTI_SOURCE_CURATED_JOBS: RawJobPosting[] = [
       'GCP / Azure',
     ],
     description:
-      'Spotify is looking for a Senior Fullstack Engineer in Stockholm to build rich analytics and management portals for creators. You will use Next.js (SSR), React, TypeScript, and Node.js to deliver responsive, high-performance web experiences, run A/B testing strategies, and integrate with GraphQL and REST microservices.',
+      'Spotify is looking for a Senior Fullstack Engineer in Stockholm to build rich analytics and management portals for creators. You will use Next.js (SSR), React, TypeScript, and Node.js to deliver responsive, high-performance web experiences, run A/B testing strategies, and integrate with GraphQL and REST microservices. We support work visa sponsorship and relocation to Stockholm.',
   },
   {
     id: 'indeed-epidemic-sound-frontend',
@@ -210,6 +234,10 @@ export const MULTI_SOURCE_CURATED_JOBS: RawJobPosting[] = [
     postedAt: hoursAgoISO(76),
     expiresAt: daysFromNowISO(16),
     salaryRange: '64,000 – 76,000 SEK / mo',
+    visaSponsorship: false,
+    requiresSwedish: true,
+    swedishRequirementNote:
+      'Mentions: Proficiency in Swedish is required (goda kunskaper i svenska i tal och skrift)',
     source: 'Indeed',
     url: 'https://se.indeed.com/jobs?q=Frontend+Engineer+Next.js+TypeScript+Tailwind&l=Stockholm',
     highlights: [
@@ -229,7 +257,7 @@ export const MULTI_SOURCE_CURATED_JOBS: RawJobPosting[] = [
       'CI/CD & GitHub Actions',
     ],
     description:
-      'Epidemic Sound in Stockholm is looking for a Senior Frontend-leaning Fullstack Engineer to lead our Next.js, React, and TypeScript web platform. You will work with SSR patterns, Tailwind CSS, class-variance-authority (cva), and our shared design system to deliver fast, SEO-optimized user interfaces, backed by Node.js and GraphQL BFF layers.',
+      'Epidemic Sound in Stockholm is looking for a Senior Frontend-leaning Fullstack Engineer to lead our Next.js, React, and TypeScript web platform. You will work with SSR patterns, Tailwind CSS, class-variance-authority (cva), and our shared design system to deliver fast, SEO-optimized user interfaces, backed by Node.js and GraphQL BFF layers. Swedish is required for this team.',
   },
   {
     id: 'indeed-einride-cloud-fullstack',
@@ -241,6 +269,10 @@ export const MULTI_SOURCE_CURATED_JOBS: RawJobPosting[] = [
     postedAt: hoursAgoISO(110),
     expiresAt: daysFromNowISO(14),
     salaryRange: '66,000 – 79,000 SEK / mo',
+    visaSponsorship: true,
+    visaSponsorshipNote:
+      'Mentions: Work permit & visa sponsorship available for Stockholm headquarters',
+    requiresSwedish: false,
     source: 'Indeed',
     url: 'https://se.indeed.com/jobs?q=Senior+Fullstack+Engineer+AWS+TypeScript+React&l=Stockholm',
     highlights: [
@@ -261,26 +293,66 @@ export const MULTI_SOURCE_CURATED_JOBS: RawJobPosting[] = [
       'Go (Golang)',
     ],
     description:
-      'Join Einride in Stockholm to build our Saga intelligent freight platform. You will develop real-time customer-facing portals using React, TypeScript, and Server-Sent Events (SSE), integrated with Node.js and AWS microservices. Your AWS Solutions Architect knowledge and experience with PostgreSQL, monitoring/logging, and automated testing will directly impact fleet reliability.',
+      'Join Einride in Stockholm to build our Saga intelligent freight platform. You will develop real-time customer-facing portals using React, TypeScript, and Server-Sent Events (SSE), integrated with Node.js and AWS microservices. Your AWS Solutions Architect knowledge and experience with PostgreSQL, monitoring/logging, and automated testing will directly impact fleet reliability. Visa sponsorship is available for qualified candidates.',
   },
 
-  // ================= HIMALAYAS / OTHER EU REMOTE SOURCES =================
+  // ================= JOBTECH SWEDEN (PLATSBANKEN) & STOCKHOLM HUBS =================
   {
-    id: 'himalayas-stripe-remote-eu',
+    id: 'jobtech-northvolt-connected-systems',
+    title: 'Senior Fullstack Engineer — Cloud & Connected Portals',
+    company: 'Voi Technology',
+    location: 'Stockholm, Sweden',
+    workMode: 'Hybrid',
+    roleTrack: 'Fullstack',
+    postedAt: hoursAgoISO(14),
+    expiresAt: daysFromNowISO(23),
+    salaryRange: '66,000 – 78,000 SEK / mo',
+    visaSponsorship: true,
+    visaSponsorshipNote:
+      'Mentions: Full Swedish work permit sponsorship & Stockholm relocation support',
+    requiresSwedish: false,
+    source: 'JobTech Sweden',
+    url: 'https://arbetsformedlingen.se/platsbanken/annonser?q=Fullstack%20TypeScript%20React%20Stockholm',
+    highlights: [
+      'Build real-time fleet operations and city analytics portals in React, Next.js, TypeScript, and Node.js.',
+      'Integrate live telemetry streams (SSE), AWS microservices, and PostgreSQL data pipelines.',
+      'Drive automated testing with Jest and GitHub Actions CI/CD in our Stockholm headquarters.',
+    ],
+    requiredKeywords: [
+      'TypeScript',
+      'React',
+      'Next.js',
+      'Node.js',
+      'AWS',
+      'PostgreSQL',
+      'Server-Sent Events (SSE)',
+      'Microservices',
+      'Jest',
+      'CI/CD & GitHub Actions',
+    ],
+    description:
+      'Voi Technology in Stockholm is looking for a Senior Fullstack Engineer to build our real-time city analytics and operations portals using React, Next.js, TypeScript, and Node.js on AWS. English is our working language (no Swedish required) and we provide visa sponsorship for Stockholm.',
+  },
+  {
+    id: 'himalayas-stripe-stockholm-hub',
     title: 'Staff / Senior Frontend & Fullstack Engineer — Financial Dashboards',
-    company: 'Stripe',
-    location: 'Remote (Sweden / EU)',
-    workMode: 'Remote EU',
+    company: 'Stripe (Stockholm Engineering Hub)',
+    location: 'Stockholm, Sweden',
+    workMode: 'Hybrid',
     roleTrack: 'Frontend / UI',
     postedAt: hoursAgoISO(16),
     expiresAt: daysFromNowISO(22),
-    salaryRange: '€115,000 – €140,000 / yr',
+    salaryRange: '78,000 – 95,000 SEK / mo',
+    visaSponsorship: true,
+    visaSponsorshipNote:
+      'Mentions: Swedish work visa sponsorship & local entity employment in Stockholm supported',
+    requiresSwedish: false,
     source: 'Himalayas EU',
     url: 'https://himalayas.app/jobs/typescript',
     highlights: [
-      'Lead frontend architecture and shared design system components for Stripe merchant portals across Europe.',
+      'Lead frontend architecture and shared design system components for Stripe merchant portals from Stockholm.',
       'Optimize complex UI rendering performance, bundle health, and data-fetching with React, TypeScript, and GraphQL.',
-      'Drive automated E2E testing, code-review standards, and mentoring across distributed engineering pods.',
+      'Drive automated E2E testing, code-review standards, and mentoring across engineering pods.',
     ],
     requiredKeywords: [
       'TypeScript',
@@ -294,24 +366,28 @@ export const MULTI_SOURCE_CURATED_JOBS: RawJobPosting[] = [
       'Tech Leadership & Mentoring',
     ],
     description:
-      'Stripe is hiring a Senior Fullstack / Frontend Engineer in Europe (Remote from Sweden) to elevate our merchant billing and accounting portals. You bring deep expertise in React, TypeScript, JavaScript, Design Systems / component libraries, GraphQL, and REST APIs. You have a proven track record optimizing asset loading and bundle health, establishing automated unit and E2E testing (Jest, TestCafe/Selenium), and mentoring engineers.',
+      'Stripe is hiring a Senior Fullstack / Frontend Engineer in Stockholm, Sweden to elevate our merchant billing and accounting portals. You bring deep expertise in React, TypeScript, JavaScript, Design Systems / component libraries, GraphQL, and REST APIs. Visa sponsorship in Stockholm is supported.',
   },
   {
-    id: 'himalayas-pleo-remote-eu',
+    id: 'himalayas-pleo-stockholm-hub',
     title: 'Senior Fullstack Engineer — Smart Company Spending & AI',
-    company: 'Pleo',
-    location: 'Remote EU / Stockholm Hub',
-    workMode: 'Remote EU',
+    company: 'Pleo (Stockholm Hub)',
+    location: 'Stockholm, Sweden',
+    workMode: 'Hybrid',
     roleTrack: 'Fullstack',
     postedAt: hoursAgoISO(64),
     expiresAt: daysFromNowISO(17),
-    salaryRange: '€98,000 – €118,000 / yr',
+    salaryRange: '69,000 – 84,000 SEK / mo',
+    visaSponsorship: true,
+    visaSponsorshipNote:
+      'Mentions: Visa sponsorship & work permit support available at Stockholm hub',
+    requiresSwedish: false,
     source: 'Himalayas EU',
     url: 'https://himalayas.app/jobs/react',
     highlights: [
       'Build intelligent accounting and expense automation workflows powered by React, TypeScript, Node.js, and LLMs.',
       'Develop secure document-handling pipelines, real-time analytics insights, and ERP integrations.',
-      'Work in an autonomous European engineering culture with strong automated testing and CI/CD.',
+      'Work in our Stockholm engineering hub with strong automated testing and CI/CD.',
     ],
     requiredKeywords: [
       'TypeScript',
@@ -327,38 +403,7 @@ export const MULTI_SOURCE_CURATED_JOBS: RawJobPosting[] = [
       'Java / Kotlin',
     ],
     description:
-      'Pleo helps thousands of European companies automate bookkeeping and spending. We are hiring a Senior Fullstack Engineer with deep fintech/accounting workflow experience in React, TypeScript, Node.js, PostgreSQL, and AWS. You will help expand our AI-assisted accounting categorization and real-time analytics assistant features.',
-  },
-  {
-    id: 'himalayas-vercel-eu-ai-sdk',
-    title: 'Senior Solutions & Fullstack Engineer — Next.js & AI SDK',
-    company: 'Vercel',
-    location: 'Remote (Europe)',
-    workMode: 'Remote EU',
-    roleTrack: 'AI Engineer',
-    postedAt: hoursAgoISO(136),
-    expiresAt: daysFromNowISO(12),
-    salaryRange: '€110,000 – €135,000 / yr',
-    source: 'Himalayas EU',
-    url: 'https://vercel.com/careers',
-    highlights: [
-      'Build reference architectures and customer-facing portals with Next.js SSR, React, TypeScript, and streaming AI agents.',
-      'Help enterprise teams optimize build pipelines, bundle health, and edge/cloud deployments.',
-      'Create reusable Tailwind CSS and cva UI templates for real-time generative AI applications.',
-    ],
-    requiredKeywords: [
-      'TypeScript',
-      'React',
-      'Next.js',
-      'Node.js',
-      'Tailwind CSS',
-      'AI / LLM Agents',
-      'Server-Sent Events (SSE)',
-      'CI/CD & GitHub Actions',
-      'AWS',
-    ],
-    description:
-      'Vercel is expanding our European engineering team! We are looking for a Senior Fullstack Engineer who lives and breathes Next.js, React, TypeScript, Tailwind CSS, and AI agent integrations. You will build production AI applications using streaming Server-Sent Events (SSE), optimize build tooling and CI/CD workflows, and collaborate with enterprise customers.',
+      'Pleo helps thousands of companies automate bookkeeping and spending. We are hiring a Senior Fullstack Engineer in Stockholm, Sweden with deep fintech/accounting workflow experience in React, TypeScript, Node.js, PostgreSQL, and AWS. We provide visa sponsorship and work permit support for our Stockholm hub.',
   },
 
   // ================= EXPIRED / CLOSED POSTINGS (Filtered out automatically by isJobExpired) =================

@@ -105,7 +105,7 @@ async function fetchJobTechSwedenJobs(): Promise<RawJobPosting[]> {
 
   try {
     const url =
-      'https://jobsearch.api.jobtechdev.se/search?q=typescript%20react%20fullstack&limit=15';
+      'https://jobsearch.api.jobtechdev.se/search?q=typescript%20react%20fullstack%20stockholm&limit=15';
     const res = await fetch(url, {
       signal: controller.signal,
       headers: { Accept: 'application/json' },
@@ -219,6 +219,7 @@ async function fetchArbeitnowEuJobs(): Promise<RawJobPosting[]> {
           ? item.created_at * 1000
           : Date.now();
       const isRemote = Boolean(item.remote);
+      const hasVisaFlag = Boolean(item.visa_sponsorship);
 
       return {
         id: `arbeitnow-${item.slug || Math.random().toString(36).slice(2)}`,
@@ -229,6 +230,10 @@ async function fetchArbeitnowEuJobs(): Promise<RawJobPosting[]> {
           : item.location || 'Europe',
         workMode: isRemote ? 'Remote EU' : 'Hybrid',
         postedAt: new Date(createdAtSec).toISOString(),
+        visaSponsorship: hasVisaFlag ? true : undefined,
+        visaSponsorshipNote: hasVisaFlag
+          ? 'Arbeitnow verified: Job post explicitly offers EU Visa Sponsorship'
+          : undefined,
         description: stripHtml(item.description || ''),
         requiredKeywords: Array.isArray(item.tags) ? item.tags : [],
         url: item.url || 'https://www.arbeitnow.com/',
@@ -394,15 +399,23 @@ export async function fetchAllJobMatches(): Promise<FetchJobsResult> {
     ...MULTI_SOURCE_CURATED_JOBS,
   ];
 
-  // 1. STRICT EXPIRATION FILTER: Never include expired or closed job postings!
+  // 1. STRICT EXPIRATION & STOCKHOLM LOCATION FILTER:
+  // Never include expired postings or jobs outside Stockholm, Sweden!
   let expiredFilteredCount = 0;
   const activeOnly: RawJobPosting[] = [];
   for (const candidate of allCandidates) {
     if (isJobExpired(candidate)) {
       expiredFilteredCount += 1;
-    } else {
-      activeOnly.push(candidate);
+      continue;
     }
+    const locLower = (candidate.location || '').toLowerCase();
+    if (!locLower.includes('stockholm')) {
+      continue;
+    }
+    activeOnly.push({
+      ...candidate,
+      location: 'Stockholm, Sweden',
+    });
   }
 
   // 2. Deduplicate active jobs by normalized title + company

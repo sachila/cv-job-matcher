@@ -50,6 +50,10 @@ export interface RawJobPosting {
   expiresAt?: string; // ISO 8601 application deadline / expiration date
   isClosedOrExpired?: boolean; // Explicit flag if source marks posting closed/removed
   salaryRange?: string;
+  visaSponsorship?: boolean; // True if job post mentions supporting work visa sponsorship
+  visaSponsorshipNote?: string; // Specific excerpt/note about visa sponsorship from the post
+  requiresSwedish?: boolean; // True if job post specifically mentions Swedish language is required
+  swedishRequirementNote?: string; // Excerpt/note about Swedish language requirement
   description: string;
   highlights?: string[];
   requiredKeywords?: string[];
@@ -60,6 +64,10 @@ export interface RawJobPosting {
 export interface JobMatchItem extends RawJobPosting {
   expiresAt: string; // Guaranteed active future expiration date
   roleTrack: RoleTrack;
+  visaSponsorship: boolean;
+  visaSponsorshipNote?: string;
+  requiresSwedish: boolean;
+  swedishRequirementNote?: string;
   highlights: string[];
   match: SkillMatchBreakdown;
 }

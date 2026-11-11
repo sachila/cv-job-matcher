@@ -19,6 +19,160 @@ function containsTerm(text: string, term: string): boolean {
   return pattern.test(text);
 }
 
+/**
+ * Detects whether a job posting mentions supporting work visa sponsorship / work permits.
+ */
+export function detectVisaSponsorship(job: RawJobPosting): {
+  supported: boolean;
+  note?: string;
+} {
+  if (typeof job.visaSponsorship === 'boolean') {
+    return {
+      supported: job.visaSponsorship,
+      note:
+        job.visaSponsorshipNote ||
+        (job.visaSponsorship
+          ? 'Job post mentions Visa Sponsorship & Work Permit support'
+          : undefined),
+    };
+  }
+
+  const combined = [
+    job.title,
+    job.description,
+    ...(job.highlights || []),
+    ...(job.requiredKeywords || []),
+  ]
+    .join(' ')
+    .toLowerCase();
+
+  // Explicit negative patterns
+  const negativePatterns = [
+    'no visa sponsorship',
+    'cannot sponsor',
+    'unable to sponsor',
+    'do not sponsor',
+    'does not sponsor',
+    'without visa sponsorship',
+    'not offering visa sponsorship',
+  ];
+  if (negativePatterns.some((pat) => combined.includes(pat))) {
+    return { supported: false };
+  }
+
+  // Explicit positive patterns mentioning visa sponsorship or work permit support
+  const positivePatterns = [
+    'visa sponsorship',
+    'sponsor visa',
+    'work visa',
+    'work permit sponsorship',
+    'work permit support',
+    'sponsor work permit',
+    'relocation and visa',
+    'relocation & visa',
+    'visa & relocation',
+    'visa and relocation',
+    'visa support',
+    'eu blue card',
+    'migrationsverket',
+  ];
+
+  if (positivePatterns.some((pat) => combined.includes(pat))) {
+    return {
+      supported: true,
+      note:
+        job.visaSponsorshipNote ||
+        'Job post mentions Visa Sponsorship & Work Permit support',
+    };
+  }
+
+  return { supported: false };
+}
+
+/**
+ * Detects whether a job posting specifically mentions that Swedish language is needed/required.
+ */
+export function detectSwedishRequirement(job: RawJobPosting): {
+  required: boolean;
+  note?: string;
+} {
+  if (typeof job.requiresSwedish === 'boolean') {
+    return {
+      required: job.requiresSwedish,
+      note:
+        job.swedishRequirementNote ||
+        (job.requiresSwedish
+          ? 'Job post specifically mentions Swedish language proficiency is required'
+          : 'English working language — No Swedish requirement mentioned'),
+    };
+  }
+
+  const combined = [
+    job.title,
+    job.description,
+    ...(job.highlights || []),
+    ...(job.requiredKeywords || []),
+  ]
+    .join(' ')
+    .toLowerCase();
+
+  // Check if explicitly stating Swedish is NOT required
+  const notRequiredPatterns = [
+    'no swedish required',
+    'swedish is not required',
+    'swedish not required',
+    'without swedish',
+    'swedish is a bonus, not a requirement',
+  ];
+  if (notRequiredPatterns.some((pat) => combined.includes(pat))) {
+    return {
+      required: false,
+      note: 'Explicitly states Swedish is not required (English working language)',
+    };
+  }
+
+  // English & Swedish phrases indicating Swedish proficiency is needed
+  const swedishRequiredPatterns = [
+    'fluent in swedish',
+    'fluency in swedish',
+    'swedish is required',
+    'swedish required',
+    'requires swedish',
+    'must speak swedish',
+    'proficient in swedish',
+    'proficiency in swedish',
+    'swedish and english',
+    'both swedish and english',
+    'native swedish',
+    'professional swedish',
+    'good command of swedish',
+    'swedish language is a requirement',
+    'flytande svenska',
+    'svenska i tal och skrift',
+    'goda kunskaper i svenska',
+    'behärskar svenska',
+    'krav på svenska',
+    'svenska och engelska',
+    'vi söker dig som',
+    'arbetsuppgifter',
+    'kvalifikationer',
+  ];
+
+  if (swedishRequiredPatterns.some((pat) => combined.includes(pat))) {
+    return {
+      required: true,
+      note:
+        job.swedishRequirementNote ||
+        'Job post mentions Swedish language proficiency is required',
+    };
+  }
+
+  return {
+    required: false,
+    note: 'English working language — No Swedish requirement mentioned',
+  };
+}
+
 export function inferRoleTrack(title: string, description: string): RoleTrack {
   const combined = `${title} ${description}`.toLowerCase();
   const titleLower = title.toLowerCase();
@@ -229,6 +383,8 @@ export function computeSkillMatch(job: RawJobPosting): SkillMatchBreakdown {
 export function enrichJobWithMatch(raw: RawJobPosting): JobMatchItem {
   const roleTrack = raw.roleTrack || inferRoleTrack(raw.title, raw.description);
   const match = computeSkillMatch(raw);
+  const visaInfo = detectVisaSponsorship(raw);
+  const swedishInfo = detectSwedishRequirement(raw);
 
   // Extract 3 concise highlights if not provided
   const highlights =
@@ -244,6 +400,10 @@ export function enrichJobWithMatch(raw: RawJobPosting): JobMatchItem {
     ...raw,
     expiresAt: raw.expiresAt || computeDefaultExpiresAt(raw.postedAt),
     roleTrack,
+    visaSponsorship: visaInfo.supported,
+    visaSponsorshipNote: visaInfo.note,
+    requiresSwedish: swedishInfo.required,
+    swedishRequirementNote: swedishInfo.note,
     highlights:
       highlights.length > 0
         ? highlights

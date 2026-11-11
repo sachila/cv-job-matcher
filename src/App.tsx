@@ -2,9 +2,13 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ArrowDownWideNarrow,
   ArrowUpNarrowWide,
+  BadgeCheck,
   Calendar,
   ExternalLink,
+  Eye,
   Filter,
+  Languages,
+  RotateCcw,
   Search,
   ShieldCheck,
   Sparkles,
@@ -14,6 +18,7 @@ import { CustomJobModal } from './components/CustomJobModal';
 import { JobCard } from './components/JobCard';
 import { JobDetailPanel } from './components/JobDetailPanel';
 import { MULTI_SOURCE_CURATED_JOBS } from './data/curatedJobs';
+import { CV_SKILLS } from './data/cvProfile';
 import { fetchAllJobMatches } from './services/jobService';
 import { JobMatchItem, JobSource, RoleTrack, SortOption } from './types/job';
 import { isJobExpired, isPostedWithinHours } from './utils/dateUtils';
@@ -33,6 +38,7 @@ export function App() {
     return { list, expiredCount };
   }, []);
 
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [jobs, setJobs] = useState<JobMatchItem[]>(initialData.list);
   const [customJobs, setCustomJobs] = useState<JobMatchItem[]>([]);
   const [expiredFilteredCount, setExpiredFilteredCount] = useState<number>(
@@ -57,18 +63,63 @@ export function App() {
   // Filters & Sorting State (Default: Sort by Posted Date — Newest First)
   const [sortBy, setSortBy] = useState<SortOption>('posted_desc');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [locationScope, setLocationScope] = useState<
-    'all' | 'stockholm' | 'remote_eu'
+  const [workModeScope, setWorkModeScope] = useState<
+    'all' | 'hybrid' | 'onsite'
   >('all');
   const [roleTrackFilter, setRoleTrackFilter] = useState<'all' | RoleTrack>(
     'all'
   );
   const [sourceFilter, setSourceFilter] = useState<'all' | JobSource>('all');
   const [minMatchScore, setMinMatchScore] = useState<number>(0);
+  const [visaSponsorshipOnly, setVisaSponsorshipOnly] =
+    useState<boolean>(false);
+  const [excludeSwedishRequired, setExcludeSwedishRequired] =
+    useState<boolean>(false);
   const [selectedSkillFilter, setSelectedSkillFilter] = useState<string | null>(
     null
   );
   const [isCustomModalOpen, setIsCustomModalOpen] = useState<boolean>(false);
+
+  // 'New' and 'Seen' Category State with localStorage persistence
+  const [seenJobIds, setSeenJobIds] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem('sachila_cv_matcher_seen_jobs');
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [viewCategory, setViewCategory] = useState<'new' | 'seen'>('new');
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        'sachila_cv_matcher_seen_jobs',
+        JSON.stringify(seenJobIds)
+      );
+    } catch {
+      // Ignore storage errors
+    }
+  }, [seenJobIds]);
+
+  const handleMarkJobSeen = useCallback((jobId: string) => {
+    setSeenJobIds((prev) => {
+      if (prev.includes(jobId)) return prev;
+      return [jobId, ...prev];
+    });
+  }, []);
+
+  const handleMarkJobUnseen = useCallback((jobId: string) => {
+    setSeenJobIds((prev) => prev.filter((id) => id !== jobId));
+  }, []);
+
+  const handleClearAllSeen = useCallback(() => {
+    setSeenJobIds([]);
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', theme === 'dark');
+  }, [theme]);
 
   const loadJobs = useCallback(async () => {
     setIsLoadingLive(true);
@@ -90,6 +141,21 @@ export function App() {
     return [...customJobs, ...jobs];
   }, [customJobs, jobs]);
 
+  const visaSponsoredTotalCount = useMemo(() => {
+    return combinedJobs.filter((j) => !isJobExpired(j) && j.visaSponsorship)
+      .length;
+  }, [combinedJobs]);
+
+  const noSwedishRequiredCount = useMemo(() => {
+    return combinedJobs.filter((j) => !isJobExpired(j) && !j.requiresSwedish)
+      .length;
+  }, [combinedJobs]);
+
+  const swedishRequiredCount = useMemo(() => {
+    return combinedJobs.filter((j) => !isJobExpired(j) && j.requiresSwedish)
+      .length;
+  }, [combinedJobs]);
+
   // Filter and sort jobs (strictly excluding expired jobs)
   const filteredAndSortedJobs = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -100,24 +166,35 @@ export function App() {
         return false;
       }
 
+      // Strict Stockholm, Sweden location guard
+      if (!job.location.toLowerCase().includes('stockholm')) {
+        return false;
+      }
+
+      // Visa Sponsorship Filter
+      if (visaSponsorshipOnly && !job.visaSponsorship) {
+        return false;
+      }
+
+      // Swedish Language Filter: exclude jobs that specifically mention Swedish is needed
+      if (excludeSwedishRequired && job.requiresSwedish) {
+        return false;
+      }
+
       // Search query filter
       if (q) {
-        const hay = `${job.title} ${job.company} ${job.location} ${job.source} ${job.description} ${job.match.matchedSkills
-          .map((s) => s.name)
-          .join(' ')}`.toLowerCase();
+        const hay = `${job.title} ${job.company} ${job.location} ${job.source} ${job.description} ${
+          job.visaSponsorshipNote || ''
+        } ${job.match.matchedSkills.map((s) => s.name).join(' ')}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
 
-      // Location & Work Mode Scope
-      if (locationScope === 'stockholm') {
-        const locLower = job.location.toLowerCase();
-        if (!locLower.includes('stockholm') && !locLower.includes('sweden')) {
-          return false;
-        }
-      } else if (locationScope === 'remote_eu') {
-        if (job.workMode !== 'Remote EU' && job.workMode !== 'Remote') {
-          return false;
-        }
+      // Stockholm Work Mode Scope
+      if (workModeScope === 'hybrid' && job.workMode !== 'Hybrid') {
+        return false;
+      }
+      if (workModeScope === 'onsite' && job.workMode !== 'On-site') {
+        return false;
       }
 
       // Role Track Filter
@@ -167,8 +244,10 @@ export function App() {
     return sorted;
   }, [
     combinedJobs,
+    visaSponsorshipOnly,
+    excludeSwedishRequired,
     searchQuery,
-    locationScope,
+    workModeScope,
     roleTrackFilter,
     sourceFilter,
     minMatchScore,
@@ -176,14 +255,31 @@ export function App() {
     sortBy,
   ]);
 
-  // Keep selectedJob in sync with filtered list
+  // Partition filtered jobs into 'New' and 'Seen'
+  const seenSet = useMemo(() => new Set(seenJobIds), [seenJobIds]);
+
+  const newJobs = useMemo(
+    () => filteredAndSortedJobs.filter((job) => !seenSet.has(job.id)),
+    [filteredAndSortedJobs, seenSet]
+  );
+
+  const seenJobs = useMemo(
+    () => filteredAndSortedJobs.filter((job) => seenSet.has(job.id)),
+    [filteredAndSortedJobs, seenSet]
+  );
+
+  const displayedJobs = viewCategory === 'new' ? newJobs : seenJobs;
+
+  // Keep selectedJob in sync with current view and filtered list
   const selectedJob = useMemo(() => {
     return (
+      displayedJobs.find((j) => j.id === selectedJobId) ||
+      displayedJobs[0] ||
       filteredAndSortedJobs.find((j) => j.id === selectedJobId) ||
       filteredAndSortedJobs[0] ||
       null
     );
-  }, [filteredAndSortedJobs, selectedJobId]);
+  }, [displayedJobs, filteredAndSortedJobs, selectedJobId]);
 
   const avgMatchScore = useMemo(() => {
     if (filteredAndSortedJobs.length === 0) return 0;
@@ -206,12 +302,37 @@ export function App() {
     setSortBy('posted_desc');
   };
 
-  const sourcePills: { label: string; value: 'all' | JobSource; count: number }[] = [
-    { label: 'All Sources', value: 'all', count: combinedJobs.length },
-    { label: 'LinkedIn', value: 'LinkedIn', count: sourceStats.linkedin },
-    { label: 'Indeed', value: 'Indeed', count: sourceStats.indeed },
+  const resetAllFilters = () => {
+    setSearchQuery('');
+    setWorkModeScope('all');
+    setRoleTrackFilter('all');
+    setSourceFilter('all');
+    setMinMatchScore(0);
+    setVisaSponsorshipOnly(false);
+    setExcludeSwedishRequired(false);
+    setSelectedSkillFilter(null);
+  };
+
+  const hasActiveFilters =
+    searchQuery !== '' ||
+    workModeScope !== 'all' ||
+    roleTrackFilter !== 'all' ||
+    sourceFilter !== 'all' ||
+    minMatchScore > 0 ||
+    visaSponsorshipOnly ||
+    excludeSwedishRequired ||
+    selectedSkillFilter !== null;
+
+  const sourcePills: {
+    label: string;
+    value: 'all' | JobSource;
+    count: number;
+  }[] = [
+    { label: 'All Active Sources', value: 'all', count: combinedJobs.length },
+    { label: 'LinkedIn SE', value: 'LinkedIn', count: sourceStats.linkedin },
+    { label: 'Indeed SE', value: 'Indeed', count: sourceStats.indeed },
     {
-      label: 'JobTech Sweden',
+      label: 'JobTech (Platsbanken)',
       value: 'JobTech Sweden',
       count: sourceStats.jobtechSweden,
     },
@@ -229,8 +350,8 @@ export function App() {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
-      {/* CV Profile & Interactive Skills Header */}
+    <div className="min-h-screen bg-[#FAF8F5] text-[#18181B] transition-colors dark:bg-[#090A0F] dark:text-zinc-100">
+      {/* Option A: Nordic Editorial Header */}
       <CVProfileHeader
         totalMatches={filteredAndSortedJobs.length}
         avgMatchScore={avgMatchScore}
@@ -241,269 +362,562 @@ export function App() {
         onSelectSkillFilter={setSelectedSkillFilter}
         onRefreshLive={loadJobs}
         onOpenCustomModal={() => setIsCustomModalOpen(true)}
+        theme={theme}
+        onToggleTheme={() =>
+          setTheme((prev) => (prev === 'light' ? 'dark' : 'light'))
+        }
       />
 
-      {/* Main Content Container */}
-      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-        {/* Multi-Source Board Selector + Sort/Filter Toolbar */}
-        <section className="rounded-2xl border border-slate-800/90 bg-slate-900/75 p-4 shadow-lg backdrop-blur">
-          {/* Row 1: Job Board Source Pills (LinkedIn, Indeed, JobTech Sweden, Arbeitnow, Remotive, Himalayas) */}
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/80 pb-3.5">
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="mr-1 text-xs font-semibold text-slate-400">
-                Job Sources:
-              </span>
-              {sourcePills.map((pill) => {
-                const active = sourceFilter === pill.value;
-                return (
-                  <button
-                    key={pill.value}
-                    type="button"
-                    onClick={() => setSourceFilter(pill.value)}
-                    className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition ${
-                      active
-                        ? 'bg-indigo-600 text-white shadow'
-                        : 'bg-slate-950 text-slate-300 ring-1 ring-inset ring-slate-800 hover:bg-slate-800 hover:text-white'
-                    }`}
-                  >
-                    <span>{pill.label}</span>
-                    <span
-                      className={`rounded-md px-1.5 py-0.5 text-[10px] ${
-                        active
-                          ? 'bg-indigo-700 text-indigo-100'
-                          : 'bg-slate-800 text-slate-400'
+      {/* Option A: 3-Column Scandi Editorial Workspace */}
+      <main className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6 lg:px-8">
+        <div className="grid gap-6 lg:grid-cols-12">
+          {/* LEFT COLUMN (3 cols): Sources, Faceted Filters & CV Core Skills */}
+          <aside className="space-y-4 lg:col-span-3">
+            <div className="sticky top-6 space-y-4">
+              {/* Job Board Sources Card */}
+              <div className="rounded-xl border border-[#E5E0D8] bg-white p-4 shadow-sm dark:border-[#1F2230] dark:bg-[#0F111A]">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-xs font-bold uppercase tracking-wider text-[#78716C] dark:text-zinc-400">
+                    Job Sources
+                  </h2>
+                  {hasActiveFilters && (
+                    <button
+                      type="button"
+                      onClick={resetAllFilters}
+                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#0F766E] hover:underline dark:text-emerald-400"
+                    >
+                      <RotateCcw className="h-3 w-3" />
+                      Reset
+                    </button>
+                  )}
+                </div>
+
+                <div className="mt-2.5 space-y-1">
+                  {sourcePills.map((pill) => {
+                    const active = sourceFilter === pill.value;
+                    return (
+                      <button
+                        key={pill.value}
+                        type="button"
+                        onClick={() => setSourceFilter(pill.value)}
+                        className={`flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-xs transition ${
+                          active
+                            ? 'bg-[#F5F2EB] font-bold text-[#18181B] ring-1 ring-inset ring-[#E5E0D8] dark:bg-[#181A26] dark:text-white dark:ring-[#2A2E42]'
+                            : 'font-medium text-[#57534E] hover:bg-[#FAF8F5] hover:text-[#18181B] dark:text-zinc-400 dark:hover:bg-[#141620] dark:hover:text-zinc-200'
+                        }`}
+                      >
+                        <span>{pill.label}</span>
+                        <span
+                          className={`rounded px-1.5 py-0.5 font-mono text-[11px] ${
+                            active
+                              ? 'bg-[#18181B] text-white dark:bg-emerald-600'
+                              : 'bg-[#F3EFEA] text-[#78716C] dark:bg-[#141722] dark:text-zinc-400'
+                          }`}
+                        >
+                          {pill.count}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Role, Location, Visa Sponsorship, Swedish Language & Match Threshold Filters */}
+                <div className="mt-4 space-y-3 border-t border-[#E5E0D8] pt-3.5 dark:border-[#1F2230]">
+                  <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[#78716C] dark:text-zinc-400">
+                    <Filter className="h-3.5 w-3.5 text-[#0F766E] dark:text-emerald-400" />
+                    Scope & Role Filters
+                  </div>
+
+                  {/* Visa Sponsorship Filter Toggle */}
+                  <div>
+                    <label className="block text-[11px] font-semibold text-[#57534E] dark:text-zinc-400">
+                      Work Visa Sponsorship
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setVisaSponsorshipOnly((prev) => !prev)}
+                      className={`mt-1 flex w-full items-center justify-between rounded-lg border px-2.5 py-2 text-xs font-semibold transition ${
+                        visaSponsorshipOnly
+                          ? 'border-[#0F766E] bg-[#E6F4F1] text-[#0F766E] shadow-2xs dark:border-teal-500 dark:bg-teal-500/20 dark:text-teal-300'
+                          : 'border-[#E5E0D8] bg-[#FAF8F5] text-[#44403C] hover:border-[#A8A29E] dark:border-[#262A3B] dark:bg-[#090A0F] dark:text-zinc-300'
                       }`}
                     >
-                      {pill.count}
+                      <span className="inline-flex items-center gap-1.5">
+                        <BadgeCheck
+                          className={`h-4 w-4 ${
+                            visaSponsorshipOnly
+                              ? 'text-[#0F766E] dark:text-teal-300'
+                              : 'text-[#78716C]'
+                          }`}
+                        />
+                        <span>Visa Sponsorship Mentioned</span>
+                      </span>
+                      <span
+                        className={`rounded px-1.5 py-0.5 font-mono text-[11px] ${
+                          visaSponsorshipOnly
+                            ? 'bg-[#0F766E] text-white dark:bg-teal-500 dark:text-zinc-950'
+                            : 'bg-[#E5E0D8]/70 text-[#57534E] dark:bg-[#141722] dark:text-zinc-400'
+                        }`}
+                      >
+                        {visaSponsoredTotalCount}
+                      </span>
+                    </button>
+                  </div>
+
+                  {/* Swedish Language Filter Toggle */}
+                  <div>
+                    <label className="block text-[11px] font-semibold text-[#57534E] dark:text-zinc-400">
+                      Swedish Language Requirement
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setExcludeSwedishRequired((prev) => !prev)}
+                      className={`mt-1 flex w-full items-center justify-between rounded-lg border px-2.5 py-2 text-xs font-semibold transition ${
+                        excludeSwedishRequired
+                          ? 'border-[#0F766E] bg-[#E6F4F1] text-[#0F766E] shadow-2xs dark:border-teal-500 dark:bg-teal-500/20 dark:text-teal-300'
+                          : 'border-[#E5E0D8] bg-[#FAF8F5] text-[#44403C] hover:border-[#A8A29E] dark:border-[#262A3B] dark:bg-[#090A0F] dark:text-zinc-300'
+                      }`}
+                    >
+                      <span className="inline-flex items-center gap-1.5">
+                        <Languages
+                          className={`h-4 w-4 ${
+                            excludeSwedishRequired
+                              ? 'text-[#0F766E] dark:text-teal-300'
+                              : 'text-[#78716C]'
+                          }`}
+                        />
+                        <span>Exclude Swedish Required</span>
+                      </span>
+                      <span
+                        className={`rounded px-1.5 py-0.5 font-mono text-[11px] ${
+                          excludeSwedishRequired
+                            ? 'bg-[#0F766E] text-white dark:bg-teal-500 dark:text-zinc-950'
+                            : 'bg-[#E5E0D8]/70 text-[#57534E] dark:bg-[#141722] dark:text-zinc-400'
+                        }`}
+                      >
+                        {noSwedishRequiredCount}
+                      </span>
+                    </button>
+                    {excludeSwedishRequired && swedishRequiredCount > 0 && (
+                      <p className="mt-1 text-[10px] font-medium text-[#0F766E] dark:text-teal-400">
+                        Hiding {swedishRequiredCount} role(s) that require
+                        Swedish
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-[#57534E] dark:text-zinc-400">
+                      Stockholm Work Mode
+                    </label>
+                    <select
+                      value={workModeScope}
+                      onChange={(e) =>
+                        setWorkModeScope(
+                          e.target.value as 'all' | 'hybrid' | 'onsite'
+                        )
+                      }
+                      aria-label="Filter by Stockholm work mode"
+                      className="mt-1 w-full rounded-lg border border-[#E5E0D8] bg-[#FAF8F5] px-2.5 py-1.5 text-xs font-medium text-[#18181B] focus:border-[#18181B] focus:outline-none dark:border-[#262A3B] dark:bg-[#090A0F] dark:text-zinc-200"
+                    >
+                      <option value="all">
+                        Stockholm, Sweden (All Work Modes)
+                      </option>
+                      <option value="hybrid">
+                        Stockholm · Hybrid Only
+                      </option>
+                      <option value="onsite">
+                        Stockholm · On-site Only
+                      </option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-[#57534E] dark:text-zinc-400">
+                      Role Track
+                    </label>
+                    <select
+                      value={roleTrackFilter}
+                      onChange={(e) =>
+                        setRoleTrackFilter(e.target.value as 'all' | RoleTrack)
+                      }
+                      aria-label="Filter by role track"
+                      className="mt-1 w-full rounded-lg border border-[#E5E0D8] bg-[#FAF8F5] px-2.5 py-1.5 text-xs font-medium text-[#18181B] focus:border-[#18181B] focus:outline-none dark:border-[#262A3B] dark:bg-[#090A0F] dark:text-zinc-200"
+                    >
+                      <option value="all">All Role Tracks</option>
+                      <option value="Fullstack">
+                        Senior Fullstack Engineer
+                      </option>
+                      <option value="AI Engineer">
+                        AI / LLM Product Engineer
+                      </option>
+                      <option value="Frontend / UI">
+                        Senior Frontend / UI
+                      </option>
+                      <option value="Tech Lead">Lead / Staff Engineer</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-[#57534E] dark:text-zinc-400">
+                      Minimum CV Match %
+                    </label>
+                    <select
+                      value={minMatchScore}
+                      onChange={(e) => setMinMatchScore(Number(e.target.value))}
+                      aria-label="Filter by minimum CV match score"
+                      className="mt-1 w-full rounded-lg border border-[#E5E0D8] bg-[#FAF8F5] px-2.5 py-1.5 text-xs font-medium text-[#18181B] focus:border-[#18181B] focus:outline-none dark:border-[#262A3B] dark:bg-[#090A0F] dark:text-zinc-200"
+                    >
+                      <option value={0}>Any CV Match %</option>
+                      <option value={70}>70%+ CV Match</option>
+                      <option value={80}>80%+ Strong Fit</option>
+                      <option value={88}>88%+ Top Tier Fit</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* CV Core Skills Filter Matrix */}
+                <div className="mt-4 border-t border-[#E5E0D8] pt-3.5 dark:border-[#1F2230]">
+                  <div className="flex items-center justify-between">
+                    <span className="inline-flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-[#78716C] dark:text-zinc-400">
+                      <Sparkles className="h-3.5 w-3.5 text-[#0F766E] dark:text-emerald-400" />
+                      CV Core Skills
                     </span>
-                  </button>
-                );
-              })}
-            </div>
+                    {selectedSkillFilter && (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedSkillFilter(null)}
+                        className="text-[11px] font-semibold text-rose-600 hover:underline dark:text-rose-400"
+                      >
+                        Clear ×
+                      </button>
+                    )}
+                  </div>
 
-            {/* Direct External Search Launchers for Sachila's CV Stack */}
-            <div className="flex flex-wrap items-center gap-2 text-[11px]">
-              <span className="text-slate-400">Live Board Search:</span>
-              <a
-                href="https://www.linkedin.com/jobs/search/?keywords=Senior%20Fullstack%20Engineer%20React%20TypeScript%20Node.js&location=Stockholm%2C%20Sweden&f_TPR=r604800&sortBy=DD"
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1 rounded-lg bg-[#0A66C2]/20 px-2.5 py-1 font-semibold text-sky-300 ring-1 ring-inset ring-[#0A66C2]/40 hover:bg-[#0A66C2]/30"
-              >
-                LinkedIn SE <ExternalLink className="h-3 w-3" />
-              </a>
-              <a
-                href="https://se.indeed.com/jobs?q=TypeScript+React+Node.js+Fullstack&l=Stockholm&fromage=14&sort=date"
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1 rounded-lg bg-blue-600/20 px-2.5 py-1 font-semibold text-blue-300 ring-1 ring-inset ring-blue-500/40 hover:bg-blue-600/30"
-              >
-                Indeed SE <ExternalLink className="h-3 w-3" />
-              </a>
-              <a
-                href="https://arbetsformedlingen.se/platsbanken/annonser?q=TypeScript%20React%20Fullstack"
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1 rounded-lg bg-teal-500/15 px-2.5 py-1 font-semibold text-teal-300 ring-1 ring-inset ring-teal-500/35 hover:bg-teal-500/25"
-              >
-                Platsbanken <ExternalLink className="h-3 w-3" />
-              </a>
-            </div>
-          </div>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {CV_SKILLS.map((skill) => {
+                      const isSelected = selectedSkillFilter === skill.name;
+                      return (
+                        <button
+                          key={skill.id}
+                          type="button"
+                          onClick={() =>
+                            setSelectedSkillFilter(
+                              isSelected ? null : skill.name
+                            )
+                          }
+                          className={`rounded-md px-2 py-1 text-[11px] font-medium transition ${
+                            isSelected
+                              ? 'bg-[#18181B] text-white shadow-2xs dark:bg-emerald-600'
+                              : 'bg-[#F3EFEA] text-[#44403C] hover:bg-[#E5E0D8] dark:bg-[#141722] dark:text-zinc-300 dark:hover:bg-[#1E2231]'
+                          }`}
+                        >
+                          {skill.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
 
-          {/* Row 2: Search Box + Sort by Posted Date Controls */}
-          <div className="mt-3.5 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="relative flex-1">
-              <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search active jobs by title, company (Klarna, Spotify, Lovable, Sana), source, or skill..."
-                className="w-full rounded-xl border border-slate-700/80 bg-slate-950/90 py-2.5 pl-10 pr-4 text-xs text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-              />
-            </div>
+                {/* Direct External Search Launchers */}
+                <div className="mt-4 border-t border-[#E5E0D8] pt-3.5 dark:border-[#1F2230]">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-[#78716C] dark:text-zinc-400">
+                    Direct Board Search
+                  </div>
+                  <div className="mt-2 grid grid-cols-1 gap-1.5 text-xs">
+                    <a
+                      href="https://www.linkedin.com/jobs/search/?keywords=Senior%20Fullstack%20Engineer%20React%20TypeScript%20Node.js&location=Stockholm%2C%20Sweden&f_TPR=r604800&sortBy=DD"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center justify-between rounded-lg border border-[#E5E0D8] bg-[#FAF8F5] px-2.5 py-1.5 font-semibold text-[#18181B] transition hover:bg-[#F3EFEA] dark:border-[#262A3B] dark:bg-[#090A0F] dark:text-zinc-200"
+                    >
+                      <span>LinkedIn Sweden (Past 7d)</span>
+                      <ExternalLink className="h-3 w-3 text-[#78716C]" />
+                    </a>
+                    <a
+                      href="https://se.indeed.com/jobs?q=TypeScript+React+Node.js+Fullstack&l=Stockholm&fromage=14&sort=date"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center justify-between rounded-lg border border-[#E5E0D8] bg-[#FAF8F5] px-2.5 py-1.5 font-semibold text-[#18181B] transition hover:bg-[#F3EFEA] dark:border-[#262A3B] dark:bg-[#090A0F] dark:text-zinc-200"
+                    >
+                      <span>Indeed Sweden (Newest)</span>
+                      <ExternalLink className="h-3 w-3 text-[#78716C]" />
+                    </a>
+                    <a
+                      href="https://arbetsformedlingen.se/platsbanken/annonser?q=TypeScript%20React%20Fullstack"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center justify-between rounded-lg border border-[#E5E0D8] bg-[#FAF8F5] px-2.5 py-1.5 font-semibold text-[#18181B] transition hover:bg-[#F3EFEA] dark:border-[#262A3B] dark:bg-[#090A0F] dark:text-zinc-200"
+                    >
+                      <span>Platsbanken Sweden</span>
+                      <ExternalLink className="h-3 w-3 text-[#78716C]" />
+                    </a>
+                  </div>
+                </div>
 
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-300">
-                <Calendar className="h-3.5 w-3.5 text-indigo-400" />
-                Sort by:
-              </span>
-
-              <div className="inline-flex rounded-xl border border-slate-800 bg-slate-950 p-1">
-                <button
-                  type="button"
-                  onClick={() => setSortBy('posted_desc')}
-                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
-                    sortBy === 'posted_desc'
-                      ? 'bg-indigo-600 text-white shadow'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  <ArrowDownWideNarrow className="h-3.5 w-3.5" />
-                  Posted Date: Newest First
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setSortBy('posted_asc')}
-                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
-                    sortBy === 'posted_asc'
-                      ? 'bg-indigo-600 text-white shadow'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  <ArrowUpNarrowWide className="h-3.5 w-3.5" />
-                  Posted Date: Oldest First
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setSortBy('match_desc')}
-                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
-                    sortBy === 'match_desc'
-                      ? 'bg-indigo-600 text-white shadow'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  <Sparkles className="h-3.5 w-3.5" />
-                  CV Match %
-                </button>
+                {/* Expiration Guard Footnote */}
+                <div className="mt-4 flex items-center gap-2 rounded-lg border border-[#C8E6C9] bg-[#E8F5E9]/60 px-3 py-2 text-[11px] font-medium text-[#1B5E20] dark:border-emerald-500/25 dark:bg-emerald-950/20 dark:text-emerald-300">
+                  <ShieldCheck className="h-4 w-4 shrink-0 text-[#0F766E] dark:text-emerald-400" />
+                  <span>
+                    {expiredFilteredCount} expired postings automatically
+                    excluded
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
+          </aside>
 
-          {/* Row 3: Location, Role Track, Minimum Match %, and Expiration Guard Status */}
-          <div className="mt-3.5 flex flex-wrap items-center justify-between gap-3 border-t border-slate-800/80 pt-3.5">
-            <div className="flex flex-wrap items-center gap-2.5">
-              <span className="inline-flex items-center gap-1 text-xs font-medium text-slate-400">
-                <Filter className="h-3.5 w-3.5 text-indigo-400" />
-                Filters:
-              </span>
-
-              {/* Location Filter */}
-              <select
-                value={locationScope}
-                onChange={(e) =>
-                  setLocationScope(
-                    e.target.value as 'all' | 'stockholm' | 'remote_eu'
-                  )
-                }
-                aria-label="Filter by location and work mode"
-                className="rounded-xl border border-slate-700/80 bg-slate-950 px-3 py-1.5 text-xs font-medium text-slate-200 focus:border-indigo-500 focus:outline-none"
-              >
-                <option value="all">
-                  All Locations (Stockholm + Remote EU)
-                </option>
-                <option value="stockholm">
-                  Stockholm / Sweden (Hybrid & On-site)
-                </option>
-                <option value="remote_eu">Remote EU Only</option>
-              </select>
-
-              {/* Role Track Filter */}
-              <select
-                value={roleTrackFilter}
-                onChange={(e) =>
-                  setRoleTrackFilter(e.target.value as 'all' | RoleTrack)
-                }
-                aria-label="Filter by role track"
-                className="rounded-xl border border-slate-700/80 bg-slate-950 px-3 py-1.5 text-xs font-medium text-slate-200 focus:border-indigo-500 focus:outline-none"
-              >
-                <option value="all">All Role Tracks</option>
-                <option value="Fullstack">Senior Fullstack Engineer</option>
-                <option value="AI Engineer">AI / LLM Product Engineer</option>
-                <option value="Frontend / UI">
-                  Senior Frontend / Design Systems
-                </option>
-                <option value="Tech Lead">Lead / Staff Engineer</option>
-              </select>
-
-              {/* Min Match Score Filter */}
-              <select
-                value={minMatchScore}
-                onChange={(e) => setMinMatchScore(Number(e.target.value))}
-                aria-label="Filter by minimum CV match score"
-                className="rounded-xl border border-slate-700/80 bg-slate-950 px-3 py-1.5 text-xs font-medium text-slate-200 focus:border-indigo-500 focus:outline-none"
-              >
-                <option value={0}>Any CV Match %</option>
-                <option value={70}>70%+ CV Match</option>
-                <option value={80}>80%+ Strong Match</option>
-                <option value={88}>88%+ Top Tier Match</option>
-              </select>
-            </div>
-
-            {/* Active / Non-Expired Guarantee Badge */}
-            <div className="flex flex-wrap items-center gap-2 text-[11px] text-emerald-300">
-              <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/10 px-2.5 py-1 ring-1 ring-inset ring-emerald-500/30">
-                <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
-                <span>
-                  Expired jobs excluded ({expiredFilteredCount} expired postings
-                  blocked)
-                </span>
-              </span>
-            </div>
-          </div>
-        </section>
-
-        {/* Two-Pane Job List + CV Match Breakdown Inspector */}
-        <section className="mt-6 grid gap-6 lg:grid-cols-12">
-          {/* Left Column: Chronologically Sorted Active Job Cards */}
-          <div className="space-y-3.5 lg:col-span-7">
-            <div className="flex items-center justify-between px-1">
-              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                {sortBy === 'posted_desc' &&
-                  'Sorted by Posted Date (Newest First)'}
-                {sortBy === 'posted_asc' &&
-                  'Sorted by Posted Date (Oldest First)'}
-                {sortBy === 'match_desc' &&
-                  'Sorted by CV Skill-Match Score (Highest First)'}
-              </h2>
-              <span className="text-xs font-medium text-slate-400">
-                Showing {filteredAndSortedJobs.length} active roles
-              </span>
-            </div>
-
-            {filteredAndSortedJobs.length === 0 ? (
-              <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-10 text-center">
-                <p className="text-sm font-semibold text-slate-300">
-                  No active jobs match the current filter combination.
-                </p>
+          {/* CENTER COLUMN (5 cols): Category Switcher, Search, Sort & Editorial Feed */}
+          <section className="space-y-3.5 lg:col-span-5">
+            {/* Category Switcher: New vs Seen Tabs */}
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#E5E0D8] bg-white p-2 shadow-sm dark:border-[#1F2230] dark:bg-[#0F111A]">
+              <div className="grid flex-1 grid-cols-2 gap-1.5 rounded-lg bg-[#F3EFEA] p-1 dark:bg-[#090A0F]">
                 <button
                   type="button"
-                  onClick={() => {
-                    setSearchQuery('');
-                    setLocationScope('all');
-                    setRoleTrackFilter('all');
-                    setSourceFilter('all');
-                    setMinMatchScore(0);
-                    setSelectedSkillFilter(null);
-                  }}
-                  className="mt-3 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-500"
+                  onClick={() => setViewCategory('new')}
+                  className={`flex items-center justify-center gap-2 rounded-md py-2 text-xs font-bold transition ${
+                    viewCategory === 'new'
+                      ? 'bg-white text-[#18181B] shadow-2xs dark:bg-[#181A26] dark:text-white'
+                      : 'text-[#57534E] hover:text-[#18181B] dark:text-zinc-400 dark:hover:text-white'
+                  }`}
                 >
-                  Reset All Filters
+                  <Sparkles className="h-3.5 w-3.5 text-[#0F766E] dark:text-emerald-400" />
+                  <span>New Jobs</span>
+                  <span
+                    className={`rounded-full px-2 py-0.5 font-mono text-[11px] ${
+                      viewCategory === 'new'
+                        ? 'bg-[#0F766E] text-white dark:bg-emerald-600'
+                        : 'bg-[#E5E0D8] text-[#44403C] dark:bg-[#141722] dark:text-zinc-300'
+                    }`}
+                  >
+                    {newJobs.length}
+                  </span>
                 </button>
+
+                <button
+                  type="button"
+                  onClick={() => setViewCategory('seen')}
+                  className={`flex items-center justify-center gap-2 rounded-md py-2 text-xs font-bold transition ${
+                    viewCategory === 'seen'
+                      ? 'bg-white text-[#18181B] shadow-2xs dark:bg-[#181A26] dark:text-white'
+                      : 'text-[#57534E] hover:text-[#18181B] dark:text-zinc-400 dark:hover:text-white'
+                  }`}
+                >
+                  <Eye className="h-3.5 w-3.5 text-[#78716C] dark:text-zinc-400" />
+                  <span>Seen Jobs</span>
+                  <span
+                    className={`rounded-full px-2 py-0.5 font-mono text-[11px] ${
+                      viewCategory === 'seen'
+                        ? 'bg-[#18181B] text-white dark:bg-zinc-200 dark:text-zinc-950'
+                        : 'bg-[#E5E0D8] text-[#44403C] dark:bg-[#141722] dark:text-zinc-300'
+                    }`}
+                  >
+                    {seenJobs.length}
+                  </span>
+                </button>
+              </div>
+
+              {viewCategory === 'seen' && seenJobs.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleClearAllSeen}
+                  title="Move all seen jobs back to the New tab"
+                  className="inline-flex items-center gap-1 rounded-lg border border-[#E5E0D8] bg-[#FAF8F5] px-3 py-1.5 text-xs font-semibold text-[#57534E] transition hover:bg-[#F3EFEA] hover:text-[#18181B] dark:border-[#262A3B] dark:bg-[#141722] dark:text-zinc-300"
+                >
+                  <RotateCcw className="h-3 w-3" />
+                  <span>Reset All to New</span>
+                </button>
+              )}
+            </div>
+
+            {/* Search + Sort Bar */}
+            <div className="rounded-xl border border-[#E5E0D8] bg-white p-3.5 shadow-sm dark:border-[#1F2230] dark:bg-[#0F111A]">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#78716C]" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search active jobs by title, company (Klarna, Spotify, Lovable, Sana), or skill..."
+                  className="w-full rounded-lg border border-[#E5E0D8] bg-[#FAF8F5] py-2 pl-9 pr-3.5 text-xs text-[#18181B] placeholder-[#78716C] focus:border-[#18181B] focus:bg-white focus:outline-none dark:border-[#262A3B] dark:bg-[#090A0F] dark:text-white dark:placeholder-zinc-500"
+                />
+              </div>
+
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-[#E5E0D8] pt-2.5 dark:border-[#1F2230]">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setVisaSponsorshipOnly((prev) => !prev)}
+                    className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-semibold transition ${
+                      visaSponsorshipOnly
+                        ? 'border-[#0F766E] bg-[#0F766E] text-white shadow-2xs dark:border-teal-500 dark:bg-teal-500 dark:text-zinc-950'
+                        : 'border-[#E5E0D8] bg-[#FAF8F5] text-[#44403C] hover:bg-[#F3EFEA] dark:border-[#262A3B] dark:bg-[#090A0F] dark:text-zinc-300'
+                    }`}
+                  >
+                    <BadgeCheck className="h-3.5 w-3.5" />
+                    <span>Visa Sponsorship ({visaSponsoredTotalCount})</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setExcludeSwedishRequired((prev) => !prev)}
+                    className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-semibold transition ${
+                      excludeSwedishRequired
+                        ? 'border-[#0F766E] bg-[#0F766E] text-white shadow-2xs dark:border-teal-500 dark:bg-teal-500 dark:text-zinc-950'
+                        : 'border-[#E5E0D8] bg-[#FAF8F5] text-[#44403C] hover:bg-[#F3EFEA] dark:border-[#262A3B] dark:bg-[#090A0F] dark:text-zinc-300'
+                    }`}
+                  >
+                    <Languages className="h-3.5 w-3.5" />
+                    <span>No Swedish Needed ({noSwedishRequiredCount})</span>
+                  </button>
+                </div>
+
+                <div className="inline-flex flex-wrap items-center gap-1">
+                  <span className="mr-1 inline-flex items-center gap-1 text-xs font-semibold text-[#57534E] dark:text-zinc-400">
+                    <Calendar className="h-3.5 w-3.5 text-[#0F766E] dark:text-emerald-400" />
+                    Sort:
+                  </span>
+                  <div className="inline-flex flex-wrap gap-1 rounded-lg bg-[#F3EFEA] p-1 dark:bg-[#090A0F]">
+                    <button
+                      type="button"
+                      onClick={() => setSortBy('posted_desc')}
+                      className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold transition ${
+                        sortBy === 'posted_desc'
+                          ? 'bg-white text-[#18181B] shadow-2xs dark:bg-[#181A26] dark:text-white'
+                          : 'text-[#57534E] hover:text-[#18181B] dark:text-zinc-400 dark:hover:text-white'
+                      }`}
+                    >
+                      <ArrowDownWideNarrow className="h-3.5 w-3.5 text-[#0F766E] dark:text-emerald-400" />
+                      Newest
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setSortBy('posted_asc')}
+                      className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold transition ${
+                        sortBy === 'posted_asc'
+                          ? 'bg-white text-[#18181B] shadow-2xs dark:bg-[#181A26] dark:text-white'
+                          : 'text-[#57534E] hover:text-[#18181B] dark:text-zinc-400 dark:hover:text-white'
+                      }`}
+                    >
+                      <ArrowUpNarrowWide className="h-3.5 w-3.5" />
+                      Oldest
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setSortBy('match_desc')}
+                      className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold transition ${
+                        sortBy === 'match_desc'
+                          ? 'bg-white text-[#18181B] shadow-2xs dark:bg-[#181A26] dark:text-white'
+                          : 'text-[#57534E] hover:text-[#18181B] dark:text-zinc-400 dark:hover:text-white'
+                      }`}
+                    >
+                      <Sparkles className="h-3.5 w-3.5 text-[#0F766E] dark:text-emerald-400" />
+                      CV Fit %
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Feed Subheader */}
+            <div className="flex items-center justify-between px-1">
+              <h2 className="text-xs font-bold uppercase tracking-wider text-[#78716C] dark:text-zinc-400">
+                {viewCategory === 'new' ? 'New Roles' : 'Seen Roles'} ·{' '}
+                {sortBy === 'posted_desc' && 'Posted Date (Newest First)'}
+                {sortBy === 'posted_asc' && 'Posted Date (Oldest First)'}
+                {sortBy === 'match_desc' && 'CV Match Score (Highest First)'}
+                {visaSponsorshipOnly && ' · Visa Sponsorship'}
+                {excludeSwedishRequired && ' · No Swedish'}
+              </h2>
+              <span className="text-xs font-semibold text-[#57534E] dark:text-zinc-400">
+                Showing {displayedJobs.length} of {filteredAndSortedJobs.length}{' '}
+                matching
+              </span>
+            </div>
+
+            {/* Job Cards Feed */}
+            {displayedJobs.length === 0 ? (
+              <div className="rounded-xl border border-[#E5E0D8] bg-white p-10 text-center shadow-sm dark:border-[#1F2230] dark:bg-[#0F111A]">
+                {viewCategory === 'seen' ? (
+                  <>
+                    <p className="text-sm font-bold text-[#18181B] dark:text-zinc-200">
+                      No seen jobs yet.
+                    </p>
+                    <p className="mt-1 text-xs text-[#78716C] dark:text-zinc-400">
+                      When you click on a job's link to view it in a new tab, it
+                      will automatically move here.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setViewCategory('new')}
+                      className="mt-4 rounded-lg bg-[#18181B] px-4 py-2 text-xs font-semibold text-white hover:bg-[#27272A] dark:bg-emerald-600"
+                    >
+                      Back to New Jobs ({newJobs.length})
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm font-bold text-[#18181B] dark:text-zinc-200">
+                      {filteredAndSortedJobs.length > 0
+                        ? 'All matching jobs have been viewed!'
+                        : 'No active jobs match the current filter combination.'}
+                    </p>
+                    <p className="mt-1 text-xs text-[#78716C] dark:text-zinc-400">
+                      {filteredAndSortedJobs.length > 0
+                        ? `You have marked all ${seenJobs.length} matching jobs as seen.`
+                        : 'Try clearing a skill filter or switching work mode.'}
+                    </p>
+                    <div className="mt-4 flex items-center justify-center gap-2">
+                      {seenJobs.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setViewCategory('seen')}
+                          className="rounded-lg bg-[#0F766E] px-4 py-2 text-xs font-semibold text-white hover:bg-[#0d645e] dark:bg-emerald-600"
+                        >
+                          View Seen Jobs ({seenJobs.length})
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={resetAllFilters}
+                        className="rounded-lg border border-[#E5E0D8] bg-white px-4 py-2 text-xs font-semibold text-[#18181B] hover:bg-[#F3EFEA] dark:border-[#262A3B] dark:bg-[#141722] dark:text-zinc-200"
+                      >
+                        Reset All Filters
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             ) : (
-              filteredAndSortedJobs.map((job, idx) => (
-                <JobCard
-                  key={job.id}
-                  job={job}
-                  rankIndex={idx}
-                  isSelected={selectedJob?.id === job.id}
-                  onSelect={(j) => setSelectedJobId(j.id)}
-                />
-              ))
+              <div className="space-y-3">
+                {displayedJobs.map((job, idx) => (
+                  <JobCard
+                    key={job.id}
+                    job={job}
+                    rankIndex={idx}
+                    isSelected={selectedJob?.id === job.id}
+                    isSeen={seenSet.has(job.id)}
+                    onSelect={(j) => setSelectedJobId(j.id)}
+                    onMarkSeen={handleMarkJobSeen}
+                    onMarkUnseen={handleMarkJobUnseen}
+                  />
+                ))}
+              </div>
             )}
-          </div>
+          </section>
 
-          {/* Right Column: Sticky CV Skill-Match Breakdown Detail Panel */}
-          <div className="lg:col-span-5">
+          {/* RIGHT COLUMN (4 cols): Sticky CV Match Scorecard Inspector */}
+          <div className="lg:col-span-4">
             <div className="sticky top-6">
-              <JobDetailPanel job={selectedJob} />
+              <JobDetailPanel
+                job={selectedJob}
+                onMarkSeen={handleMarkJobSeen}
+              />
             </div>
           </div>
-        </section>
+        </div>
       </main>
 
       {/* Custom Job Description Matcher Modal */}
