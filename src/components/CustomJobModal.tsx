@@ -1,18 +1,20 @@
 import React, { useState } from 'react';
 import { FilePlus2, Sparkles, X } from 'lucide-react';
-import { JobMatchItem, WorkMode } from '../types/job';
+import { CVProfile, JobMatchItem, WorkMode } from '../types/job';
 import { enrichJobWithMatch } from '../utils/jobMatcher';
 
 interface CustomJobModalProps {
   isOpen: boolean;
   onClose: () => void;
   onAddJob: (job: JobMatchItem) => void;
+  profile?: CVProfile;
 }
 
 export const CustomJobModal: React.FC<CustomJobModalProps> = ({
   isOpen,
   onClose,
   onAddJob,
+  profile,
 }) => {
   const [title, setTitle] = useState('');
   const [company, setCompany] = useState('');
@@ -37,7 +39,7 @@ export const CustomJobModal: React.FC<CustomJobModalProps> = ({
       description: description.trim(),
       url: url.trim() || 'https://www.linkedin.com/jobs/',
       source: 'Custom JD',
-    });
+    }, profile);
 
     onAddJob(customJob);
     setTitle('');

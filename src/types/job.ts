@@ -2,13 +2,14 @@ export type SkillCategory =
   | 'Frontend & UI'
   | 'Backend & APIs'
   | 'Cloud, DevOps & Testing'
-  | 'AI & Engineering Leadership';
+  | 'AI & Engineering Leadership'
+  | 'Quality Assurance & Testing';
 
 export interface CVSkill {
   id: string;
   name: string;
   category: SkillCategory;
-  weight: number; // 1 to 10 importance weight in Sachila's CV
+  weight: number; // 1 to 10 importance weight in CV
   aliases: string[];
 }
 
@@ -18,7 +19,9 @@ export type RoleTrack =
   | 'Fullstack'
   | 'Frontend / UI'
   | 'AI Engineer'
-  | 'Tech Lead';
+  | 'Tech Lead'
+  | 'QA / Test'
+  | 'DevOps / Platform';
 
 export type JobSource =
   | 'LinkedIn'
@@ -70,6 +73,47 @@ export interface JobMatchItem extends RawJobPosting {
   swedishRequirementNote?: string;
   highlights: string[];
   match: SkillMatchBreakdown;
+}
+
+export interface CVExperience {
+  role: string;
+  company: string;
+  location: string;
+  period: string;
+  highlights: string[];
+}
+
+export interface CVCertification {
+  name: string;
+  issuer?: string;
+  date?: string;
+  year?: string;
+}
+
+export interface CVEducation {
+  degree: string;
+  institution: string;
+  period?: string;
+}
+
+export interface CVProfile {
+  id: string;
+  isDefault?: boolean;
+  name: string;
+  title: string;
+  location: string;
+  email?: string;
+  phone?: string;
+  linkedin?: string;
+  portfolio?: string;
+  yearsOfExperience: number;
+  summary: string;
+  certifications: CVCertification[];
+  education: CVEducation[];
+  experience: CVExperience[];
+  skills: CVSkill[];
+  primarySearchKeywords: string[];
+  targetRoleTrack: RoleTrack;
 }
 
 export type SortOption =

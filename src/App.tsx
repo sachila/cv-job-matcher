@@ -15,28 +15,54 @@ import {
 } from 'lucide-react';
 import { CVProfileHeader } from './components/CVProfileHeader';
 import { CustomJobModal } from './components/CustomJobModal';
+import { CVUploadModal } from './components/CVUploadModal';
 import { JobCard } from './components/JobCard';
 import { JobDetailPanel } from './components/JobDetailPanel';
 import { MULTI_SOURCE_CURATED_JOBS } from './data/curatedJobs';
-import { CV_SKILLS } from './data/cvProfile';
+import { SACHILA_CV_PROFILE } from './data/cvProfile';
 import { fetchAllJobMatches } from './services/jobService';
-import { JobMatchItem, JobSource, RoleTrack, SortOption } from './types/job';
+import {
+  CVProfile,
+  JobMatchItem,
+  JobSource,
+  RoleTrack,
+  SortOption,
+} from './types/job';
 import { isJobExpired, isPostedWithinHours } from './utils/dateUtils';
 import { enrichJobWithMatch } from './utils/jobMatcher';
 
 export function App() {
-  // Initialize immediately with active (non-expired) multi-source listings
+  // Manage Active CV Profile with localStorage persistence (Default: Sachila Ranawaka)
+  const [activeProfile, setActiveProfile] = useState<CVProfile>(() => {
+    try {
+      const stored = localStorage.getItem('cv_matcher_active_profile');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed && parsed.id && parsed.skills) {
+          return parsed;
+        }
+      }
+    } catch {
+      // fallback
+    }
+    return SACHILA_CV_PROFILE;
+  });
+
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState<boolean>(false);
+  const isCustomProfile = activeProfile.id !== SACHILA_CV_PROFILE.id;
+
+  // Initialize immediately with active (non-expired) multi-source listings enriched against activeProfile
   const initialData = useMemo(() => {
     const activeRaw = MULTI_SOURCE_CURATED_JOBS.filter(
       (j) => !isJobExpired(j)
     );
     const expiredCount = MULTI_SOURCE_CURATED_JOBS.length - activeRaw.length;
-    const list = activeRaw.map(enrichJobWithMatch);
+    const list = activeRaw.map((job) => enrichJobWithMatch(job, activeProfile));
     list.sort(
       (a, b) => new Date(b.postedAt).getTime() - new Date(a.postedAt).getTime()
     );
     return { list, expiredCount };
-  }, []);
+  }, [activeProfile]);
 
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [jobs, setJobs] = useState<JobMatchItem[]>(initialData.list);
@@ -121,17 +147,58 @@ export function App() {
     document.documentElement.classList.toggle('dark', theme === 'dark');
   }, [theme]);
 
-  const loadJobs = useCallback(async () => {
-    setIsLoadingLive(true);
-    try {
-      const result = await fetchAllJobMatches();
-      setJobs(result.jobs);
-      setExpiredFilteredCount(result.expiredFilteredCount);
-      setSourceStats(result.sourceBreakdown);
-    } finally {
-      setIsLoadingLive(false);
-    }
-  }, []);
+  const loadJobs = useCallback(
+    async (profileToUse?: CVProfile) => {
+      setIsLoadingLive(true);
+      try {
+        const prof = profileToUse || activeProfile;
+        const result = await fetchAllJobMatches(prof);
+        setJobs(result.jobs);
+        setExpiredFilteredCount(result.expiredFilteredCount);
+        setSourceStats(result.sourceBreakdown);
+      } finally {
+        setIsLoadingLive(false);
+      }
+    },
+    [activeProfile]
+  );
+
+  const handleApplyProfile = useCallback(
+    (newProfile: CVProfile) => {
+      setActiveProfile(newProfile);
+      try {
+        localStorage.setItem(
+          'cv_matcher_active_profile',
+          JSON.stringify(newProfile)
+        );
+      } catch {
+        // ignore storage errors
+      }
+
+      // Reset skill filter if not present in new profile
+      if (
+        selectedSkillFilter &&
+        !newProfile.skills.some(
+          (s) => s.name.toLowerCase() === selectedSkillFilter.toLowerCase()
+        )
+      ) {
+        setSelectedSkillFilter(null);
+      }
+
+      // Re-enrich any custom added jobs
+      setCustomJobs((prev) =>
+        prev.map((job) => enrichJobWithMatch(job, newProfile))
+      );
+
+      // Re-fetch and re-score live jobs with new profile
+      loadJobs(newProfile);
+    },
+    [selectedSkillFilter, loadJobs]
+  );
+
+  const handleResetToDefaultProfile = useCallback(() => {
+    handleApplyProfile(SACHILA_CV_PROFILE);
+  }, [handleApplyProfile]);
 
   useEffect(() => {
     loadJobs();
@@ -353,6 +420,10 @@ export function App() {
     <div className="min-h-screen bg-[#FAF8F5] text-[#18181B] transition-colors dark:bg-[#090A0F] dark:text-zinc-100">
       {/* Option A: Nordic Editorial Header */}
       <CVProfileHeader
+        profile={activeProfile}
+        isCustomProfile={isCustomProfile}
+        onOpenUploadModal={() => setIsUploadModalOpen(true)}
+        onResetToDefault={handleResetToDefaultProfile}
         totalMatches={filteredAndSortedJobs.length}
         avgMatchScore={avgMatchScore}
         freshLast24hCount={freshLast24hCount}
@@ -360,7 +431,7 @@ export function App() {
         isLoading={isLoadingLive}
         selectedSkillFilter={selectedSkillFilter}
         onSelectSkillFilter={setSelectedSkillFilter}
-        onRefreshLive={loadJobs}
+        onRefreshLive={() => loadJobs(activeProfile)}
         onOpenCustomModal={() => setIsCustomModalOpen(true)}
         theme={theme}
         onToggleTheme={() =>
@@ -548,6 +619,12 @@ export function App() {
                       <option value="Fullstack">
                         Senior Fullstack Engineer
                       </option>
+                      <option value="QA / Test">
+                        QA & Test Automation
+                      </option>
+                      <option value="DevOps / Platform">
+                        DevOps & Cloud Platform
+                      </option>
                       <option value="AI Engineer">
                         AI / LLM Product Engineer
                       </option>
@@ -576,12 +653,12 @@ export function App() {
                   </div>
                 </div>
 
-                {/* CV Core Skills Filter Matrix */}
+                {/* Dynamic CV Core Skills Filter Matrix */}
                 <div className="mt-4 border-t border-[#E5E0D8] pt-3.5 dark:border-[#1F2230]">
                   <div className="flex items-center justify-between">
                     <span className="inline-flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-[#78716C] dark:text-zinc-400">
                       <Sparkles className="h-3.5 w-3.5 text-[#0F766E] dark:text-emerald-400" />
-                      CV Core Skills
+                      {activeProfile.name.split(' ')[0]}&apos;s CV Skills
                     </span>
                     {selectedSkillFilter && (
                       <button
@@ -594,8 +671,8 @@ export function App() {
                     )}
                   </div>
 
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {CV_SKILLS.map((skill) => {
+                  <div className="mt-2 flex flex-wrap gap-1.5 max-h-48 overflow-y-auto">
+                    {activeProfile.skills.map((skill) => {
                       const isSelected = selectedSkillFilter === skill.name;
                       return (
                         <button
@@ -622,35 +699,41 @@ export function App() {
                 {/* Direct External Search Launchers */}
                 <div className="mt-4 border-t border-[#E5E0D8] pt-3.5 dark:border-[#1F2230]">
                   <div className="text-[11px] font-bold uppercase tracking-wider text-[#78716C] dark:text-zinc-400">
-                    Direct Board Search
+                    Direct Board Search ({activeProfile.targetRoleTrack})
                   </div>
                   <div className="mt-2 grid grid-cols-1 gap-1.5 text-xs">
                     <a
-                      href="https://www.linkedin.com/jobs/search/?keywords=Senior%20Fullstack%20Engineer%20React%20TypeScript%20Node.js&location=Stockholm%2C%20Sweden&f_TPR=r604800&sortBy=DD"
+                      href={`https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(
+                        `${activeProfile.title} ${activeProfile.primarySearchKeywords.slice(0, 2).join(' ')}`
+                      )}&location=Stockholm%2C%20Sweden&f_TPR=r604800&sortBy=DD`}
                       target="_blank"
                       rel="noreferrer"
                       className="flex items-center justify-between rounded-lg border border-[#E5E0D8] bg-[#FAF8F5] px-2.5 py-1.5 font-semibold text-[#18181B] transition hover:bg-[#F3EFEA] dark:border-[#262A3B] dark:bg-[#090A0F] dark:text-zinc-200"
                     >
-                      <span>LinkedIn Sweden (Past 7d)</span>
-                      <ExternalLink className="h-3 w-3 text-[#78716C]" />
+                      <span className="truncate">LinkedIn: {activeProfile.title}</span>
+                      <ExternalLink className="h-3 w-3 shrink-0 text-[#78716C]" />
                     </a>
                     <a
-                      href="https://se.indeed.com/jobs?q=TypeScript+React+Node.js+Fullstack&l=Stockholm&fromage=14&sort=date"
+                      href={`https://se.indeed.com/jobs?q=${encodeURIComponent(
+                        `${activeProfile.title} ${activeProfile.primarySearchKeywords.slice(0, 2).join(' ')}`
+                      )}&l=Stockholm&fromage=14&sort=date`}
                       target="_blank"
                       rel="noreferrer"
                       className="flex items-center justify-between rounded-lg border border-[#E5E0D8] bg-[#FAF8F5] px-2.5 py-1.5 font-semibold text-[#18181B] transition hover:bg-[#F3EFEA] dark:border-[#262A3B] dark:bg-[#090A0F] dark:text-zinc-200"
                     >
-                      <span>Indeed Sweden (Newest)</span>
-                      <ExternalLink className="h-3 w-3 text-[#78716C]" />
+                      <span className="truncate">Indeed: {activeProfile.title}</span>
+                      <ExternalLink className="h-3 w-3 shrink-0 text-[#78716C]" />
                     </a>
                     <a
-                      href="https://arbetsformedlingen.se/platsbanken/annonser?q=TypeScript%20React%20Fullstack"
+                      href={`https://arbetsformedlingen.se/platsbanken/annonser?q=${encodeURIComponent(
+                        `${activeProfile.primarySearchKeywords.slice(0, 3).join(' ')} Stockholm`
+                      )}`}
                       target="_blank"
                       rel="noreferrer"
                       className="flex items-center justify-between rounded-lg border border-[#E5E0D8] bg-[#FAF8F5] px-2.5 py-1.5 font-semibold text-[#18181B] transition hover:bg-[#F3EFEA] dark:border-[#262A3B] dark:bg-[#090A0F] dark:text-zinc-200"
                     >
-                      <span>Platsbanken Sweden</span>
-                      <ExternalLink className="h-3 w-3 text-[#78716C]" />
+                      <span className="truncate">Platsbanken: {activeProfile.title}</span>
+                      <ExternalLink className="h-3 w-3 shrink-0 text-[#78716C]" />
                     </a>
                   </div>
                 </div>
@@ -925,6 +1008,15 @@ export function App() {
         isOpen={isCustomModalOpen}
         onClose={() => setIsCustomModalOpen(false)}
         onAddJob={handleAddCustomJob}
+        profile={activeProfile}
+      />
+
+      {/* Dynamic CV Upload & Switch Modal */}
+      <CVUploadModal
+        isOpen={isUploadModalOpen}
+        onClose={() => setIsUploadModalOpen(false)}
+        activeProfile={activeProfile}
+        onApplyProfile={handleApplyProfile}
       />
     </div>
   );

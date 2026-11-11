@@ -1,5 +1,5 @@
 import { MULTI_SOURCE_CURATED_JOBS } from '../data/curatedJobs';
-import { JobMatchItem, RawJobPosting, WorkMode } from '../types/job';
+import { CVProfile, JobMatchItem, RawJobPosting, WorkMode } from '../types/job';
 import { computeDefaultExpiresAt, isJobExpired } from '../utils/dateUtils';
 import { enrichJobWithMatch } from '../utils/jobMatcher';
 
@@ -99,13 +99,18 @@ async function fetchLinkedInProxyJobs(): Promise<RawJobPosting[]> {
  * 2. Sweden's Official Arbetsförmedlingen JobTech API (Platsbanken)
  * Includes explicit `application_deadline` and `removed` status to filter out expired jobs.
  */
-async function fetchJobTechSwedenJobs(): Promise<RawJobPosting[]> {
+async function fetchJobTechSwedenJobs(
+  profile?: CVProfile
+): Promise<RawJobPosting[]> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 6000);
 
   try {
-    const url =
-      'https://jobsearch.api.jobtechdev.se/search?q=typescript%20react%20fullstack%20stockholm&limit=15';
+    const keywords = profile?.primarySearchKeywords?.length
+      ? profile.primarySearchKeywords.slice(0, 3).join(' ')
+      : 'typescript react fullstack';
+    const query = encodeURIComponent(`${keywords} stockholm`);
+    const url = `https://jobsearch.api.jobtechdev.se/search?q=${query}&limit=20`;
     const res = await fetch(url, {
       signal: controller.signal,
       headers: { Accept: 'application/json' },
@@ -250,13 +255,18 @@ async function fetchArbeitnowEuJobs(): Promise<RawJobPosting[]> {
 /**
  * 4. Remotive Public Remote Software Dev API
  */
-async function fetchRemotiveJobs(): Promise<RawJobPosting[]> {
+async function fetchRemotiveJobs(
+  profile?: CVProfile
+): Promise<RawJobPosting[]> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 6000);
 
   try {
+    const searchParam = encodeURIComponent(
+      profile?.primarySearchKeywords?.[0] || 'typescript'
+    );
     const res = await fetch(
-      'https://remotive.com/api/remote-jobs?category=software-dev&search=typescript&limit=10',
+      `https://remotive.com/api/remote-jobs?category=software-dev&search=${searchParam}&limit=10`,
       {
         signal: controller.signal,
         headers: { Accept: 'application/json' },
@@ -364,7 +374,9 @@ async function fetchHimalayasJobs(): Promise<RawJobPosting[]> {
   }
 }
 
-export async function fetchAllJobMatches(): Promise<FetchJobsResult> {
+export async function fetchAllJobMatches(
+  profile?: CVProfile
+): Promise<FetchJobsResult> {
   const [
     linkedInProxyRes,
     jobtechRes,
@@ -373,9 +385,9 @@ export async function fetchAllJobMatches(): Promise<FetchJobsResult> {
     himalayasRes,
   ] = await Promise.allSettled([
     fetchLinkedInProxyJobs(),
-    fetchJobTechSwedenJobs(),
+    fetchJobTechSwedenJobs(profile),
     fetchArbeitnowEuJobs(),
-    fetchRemotiveJobs(),
+    fetchRemotiveJobs(profile),
     fetchHimalayasJobs(),
   ]);
 
@@ -431,8 +443,8 @@ export async function fetchAllJobMatches(): Promise<FetchJobsResult> {
     }
   }
 
-  // 3. Enrich every active job with Sachila's CV Skill-Match Breakdown
-  const enriched = deduplicated.map(enrichJobWithMatch);
+  // 3. Enrich every active job with CV Skill-Match Breakdown for this profile
+  const enriched = deduplicated.map((job) => enrichJobWithMatch(job, profile));
 
   // 4. Default sort: Posted Date (Newest First)
   enriched.sort(

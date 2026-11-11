@@ -1,6 +1,7 @@
-import { CV_SKILLS, NON_CV_TECH_KEYWORDS } from '../data/cvProfile';
+import { CV_SKILLS, NON_CV_TECH_KEYWORDS, SACHILA_CV_PROFILE } from '../data/cvProfile';
 import {
   CVSkill,
+  CVProfile,
   JobMatchItem,
   RawJobPosting,
   RoleTrack,
@@ -178,6 +179,33 @@ export function inferRoleTrack(title: string, description: string): RoleTrack {
   const titleLower = title.toLowerCase();
 
   if (
+    titleLower.includes('qa ') ||
+    titleLower.includes('qa/') ||
+    titleLower.includes('qa-') ||
+    titleLower.includes('sdet') ||
+    titleLower.includes('test') ||
+    titleLower.includes('quality assurance') ||
+    titleLower.includes('automation engineer') ||
+    titleLower.includes('software tester') ||
+    combined.includes('playwright') ||
+    combined.includes('cypress') ||
+    combined.includes('selenium')
+  ) {
+    return 'QA / Test';
+  }
+
+  if (
+    titleLower.includes('devops') ||
+    titleLower.includes('platform') ||
+    titleLower.includes('sre') ||
+    titleLower.includes('site reliability') ||
+    titleLower.includes('cloud engineer') ||
+    titleLower.includes('infrastructure')
+  ) {
+    return 'DevOps / Platform';
+  }
+
+  if (
     titleLower.includes('lead') ||
     titleLower.includes('staff') ||
     titleLower.includes('principal') ||
@@ -208,7 +236,16 @@ export function inferRoleTrack(title: string, description: string): RoleTrack {
   return 'Fullstack';
 }
 
-export function computeSkillMatch(job: RawJobPosting): SkillMatchBreakdown {
+export function computeSkillMatch(
+  job: RawJobPosting,
+  profile?: CVProfile
+): SkillMatchBreakdown {
+  const activeProfile = profile || SACHILA_CV_PROFILE;
+  const cvSkills =
+    activeProfile.skills && activeProfile.skills.length > 0
+      ? activeProfile.skills
+      : CV_SKILLS;
+
   const searchableText = [
     job.title,
     job.company,
@@ -222,7 +259,7 @@ export function computeSkillMatch(job: RawJobPosting): SkillMatchBreakdown {
 
   // 1. Detect Matched CV Skills
   const matchedSkills: CVSkill[] = [];
-  for (const skill of CV_SKILLS) {
+  for (const skill of cvSkills) {
     const isMatched = skill.aliases.some((alias) =>
       containsTerm(searchableText, alias)
     );
@@ -241,14 +278,20 @@ export function computeSkillMatch(job: RawJobPosting): SkillMatchBreakdown {
       containsTerm(searchableText, alias)
     );
     if (isPresent) {
-      missingSkillsSet.add(nonCvSkill.name);
+      // Don't mark as missing if the active profile already has this skill
+      const coveredInProfile = cvSkills.some((s) =>
+        s.aliases.some((a) => a.toLowerCase() === nonCvSkill.name.toLowerCase())
+      );
+      if (!coveredInProfile) {
+        missingSkillsSet.add(nonCvSkill.name);
+      }
     }
   }
 
-  // Also check if job has explicit requiredKeywords not covered by CV_SKILLS
+  // Also check if job has explicit requiredKeywords not covered by profile skills
   if (job.requiredKeywords) {
     for (const kw of job.requiredKeywords) {
-      const coveredByCv = CV_SKILLS.some(
+      const coveredByCv = cvSkills.some(
         (s) =>
           s.name.toLowerCase() === kw.toLowerCase() ||
           s.aliases.some((a) => a.toLowerCase() === kw.toLowerCase())
@@ -263,8 +306,13 @@ export function computeSkillMatch(job: RawJobPosting): SkillMatchBreakdown {
 
   // 3. Calculate Sub-Scores
   const matchedIds = new Set(matchedSkills.map((s) => s.id));
-  const corePillars = ['typescript', 'react', 'nextjs', 'nodejs', 'aws', 'ai-agents'];
-  const matchedCoreCount = corePillars.filter((id) => matchedIds.has(id)).length;
+  
+  // Top 5-6 pillar skills from profile
+  const sortedPillars = [...cvSkills]
+    .sort((a, b) => b.weight - a.weight)
+    .slice(0, 6)
+    .map((s) => s.id);
+  const matchedCoreCount = sortedPillars.filter((id) => matchedIds.has(id)).length;
 
   const totalDetectedSkills = matchedSkills.length + missingSkills.length;
   const rawCoverageRatio =
@@ -272,7 +320,10 @@ export function computeSkillMatch(job: RawJobPosting): SkillMatchBreakdown {
 
   // Tech stack score (0-100)
   const weightedSum = matchedSkills.reduce((acc, s) => acc + s.weight, 0);
-  const baseStackScore = Math.min(100, Math.round(rawCoverageRatio * 72 + Math.min(28, weightedSum * 0.45)));
+  const baseStackScore = Math.min(
+    100,
+    Math.round(rawCoverageRatio * 72 + Math.min(28, weightedSum * 0.45))
+  );
   const techStackScore = Math.max(
     45,
     Math.min(99, baseStackScore + (matchedCoreCount >= 3 ? 6 : 0))
@@ -289,14 +340,16 @@ export function computeSkillMatch(job: RawJobPosting): SkillMatchBreakdown {
   ) {
     roleSeniorityScore += 12;
   }
-  if (
-    titleLower.includes('fullstack') ||
-    titleLower.includes('full-stack') ||
-    titleLower.includes('full stack') ||
-    titleLower.includes('react') ||
-    titleLower.includes('typescript') ||
-    titleLower.includes('frontend') ||
-    titleLower.includes('ai')
+
+  // Role track affinity
+  const targetTrack = activeProfile.targetRoleTrack;
+  const inferred = inferRoleTrack(job.title, job.description);
+  if (inferred === targetTrack) {
+    roleSeniorityScore += 10;
+  } else if (
+    activeProfile.primarySearchKeywords.some((kw) =>
+      titleLower.includes(kw.toLowerCase())
+    )
   ) {
     roleSeniorityScore += 8;
   }
@@ -307,7 +360,11 @@ export function computeSkillMatch(job: RawJobPosting): SkillMatchBreakdown {
   let locationDomainScore = 80;
   if (locLower.includes('stockholm') || locLower.includes('sweden')) {
     locationDomainScore = 98;
-  } else if (job.workMode === 'Remote EU' || locLower.includes('europe') || locLower.includes('eu')) {
+  } else if (
+    job.workMode === 'Remote EU' ||
+    locLower.includes('europe') ||
+    locLower.includes('eu')
+  ) {
     locationDomainScore = 92;
   } else if (job.workMode === 'Remote') {
     locationDomainScore = 86;
@@ -326,46 +383,107 @@ export function computeSkillMatch(job: RawJobPosting): SkillMatchBreakdown {
     )
   );
 
-  // 4. Generate tailored CV Evidence Reasons linking directly to Sachila's background
+  // 4. Generate tailored CV Evidence Reasons
   const cvEvidenceReasons: string[] = [];
 
-  if (matchedIds.has('react') && matchedIds.has('typescript') && matchedIds.has('nodejs')) {
-    cvEvidenceReasons.push(
-      'Direct core-stack match with your 5+ years at Qvalia (Stockholm) building customer-facing React, TypeScript & Node.js applications.'
-    );
-  } else if (matchedIds.has('react') && matchedIds.has('typescript')) {
-    cvEvidenceReasons.push(
-      'Strong frontend alignment with your Senior Developer track record in React & TypeScript across Qvalia and Creative Software.'
-    );
-  }
+  if (activeProfile.id === 'sachila') {
+    // Specialized Sachila Ranawaka high-fidelity evidence
+    if (
+      matchedIds.has('react') &&
+      matchedIds.has('typescript') &&
+      matchedIds.has('nodejs')
+    ) {
+      cvEvidenceReasons.push(
+        'Direct core-stack match with your 5+ years at Qvalia (Stockholm) building customer-facing React, TypeScript & Node.js applications.'
+      );
+    } else if (matchedIds.has('react') && matchedIds.has('typescript')) {
+      cvEvidenceReasons.push(
+        'Strong frontend alignment with your Senior Developer track record in React & TypeScript across Qvalia and Creative Software.'
+      );
+    }
 
-  if (matchedIds.has('ai-agents') || matchedIds.has('sse')) {
-    cvEvidenceReasons.push(
-      'Matches your hands-on AI engineering experience integrating real-time LLM analytics assistants with Server-Sent Events (SSE) and custom agent skills.'
-    );
-  }
+    if (matchedIds.has('ai-agents') || matchedIds.has('sse')) {
+      cvEvidenceReasons.push(
+        'Matches your hands-on AI engineering experience integrating real-time LLM analytics assistants with Server-Sent Events (SSE) and custom agent skills.'
+      );
+    }
 
-  if (matchedIds.has('nextjs') || matchedIds.has('tailwind') || matchedIds.has('design-systems')) {
-    cvEvidenceReasons.push(
-      'Leverages your Next.js SSR, Tailwind CSS, and class-variance-authority (cva) design system architecture experience.'
-    );
-  }
+    if (
+      matchedIds.has('nextjs') ||
+      matchedIds.has('tailwind') ||
+      matchedIds.has('design-systems')
+    ) {
+      cvEvidenceReasons.push(
+        'Leverages your Next.js SSR, Tailwind CSS, and class-variance-authority (cva) design system architecture experience.'
+      );
+    }
 
-  if (matchedIds.has('aws') || matchedIds.has('microservices') || matchedIds.has('cicd')) {
-    cvEvidenceReasons.push(
-      'Backed by your AWS Certified Solutions Architect (Jan 2026) credential and microservices / CI/CD pipeline ownership.'
-    );
-  }
+    if (
+      matchedIds.has('aws') ||
+      matchedIds.has('microservices') ||
+      matchedIds.has('cicd')
+    ) {
+      cvEvidenceReasons.push(
+        'Backed by your AWS Certified Solutions Architect (Jan 2026) credential and microservices / CI/CD pipeline ownership.'
+      );
+    }
 
-  if (matchedIds.has('fintech')) {
-    cvEvidenceReasons.push(
-      'High domain synergy with your fintech, accounting workflows, and RBAC security background at Qvalia.'
-    );
+    if (matchedIds.has('fintech')) {
+      cvEvidenceReasons.push(
+        'High domain synergy with your fintech, accounting workflows, and RBAC security background at Qvalia.'
+      );
+    }
+  } else {
+    // Dynamic Evidence Generation for any uploaded/selected CV Profile
+    // 1. Check experience alignment
+    if (activeProfile.experience && activeProfile.experience.length > 0) {
+      let bestExp = activeProfile.experience[0];
+      let bestMatchCount = 0;
+
+      for (const exp of activeProfile.experience) {
+        const expText = `${exp.role} ${exp.company} ${exp.highlights.join(
+          ' '
+        )}`.toLowerCase();
+        const count = matchedSkills.filter((s) =>
+          s.aliases.some((a) => expText.includes(a.toLowerCase()))
+        ).length;
+        if (count > bestMatchCount) {
+          bestMatchCount = count;
+          bestExp = exp;
+        }
+      }
+
+      if (bestExp) {
+        cvEvidenceReasons.push(
+          `Strong role synergy with your experience as ${bestExp.role} at ${bestExp.company} (${bestExp.period}) leveraging ${matchedSkills.slice(0, 3).map((s) => s.name).join(', ')}.`
+        );
+      }
+    }
+
+    // 2. Check certification alignment
+    if (activeProfile.certifications && activeProfile.certifications.length > 0) {
+      const topCert = activeProfile.certifications[0];
+      const certTime = topCert.year || topCert.date ? ` (${topCert.year || topCert.date})` : '';
+      cvEvidenceReasons.push(
+        `Reinforced by your verified certification: ${topCert.name}${certTime}.`
+      );
+    }
+
+    // 3. Check education alignment
+    if (activeProfile.education && activeProfile.education.length > 0) {
+      const topEdu = activeProfile.education[0];
+      cvEvidenceReasons.push(
+        `Supported by your ${topEdu.degree} from ${topEdu.institution}.`
+      );
+    }
   }
 
   if (cvEvidenceReasons.length === 0) {
     cvEvidenceReasons.push(
-      `Matches ${matchedSkills.length} technical skills from your MSc & 9+ years of full-stack software engineering profile.`
+      `Matches ${matchedSkills.length} verified competencies (${matchedSkills
+        .slice(0, 4)
+        .map((s) => s.name)
+        .join(', ')}) from your ${activeProfile.yearsOfExperience}+ years ${activeProfile.title} background.`
     );
   }
 
@@ -380,9 +498,12 @@ export function computeSkillMatch(job: RawJobPosting): SkillMatchBreakdown {
   };
 }
 
-export function enrichJobWithMatch(raw: RawJobPosting): JobMatchItem {
+export function enrichJobWithMatch(
+  raw: RawJobPosting,
+  profile?: CVProfile
+): JobMatchItem {
   const roleTrack = raw.roleTrack || inferRoleTrack(raw.title, raw.description);
-  const match = computeSkillMatch(raw);
+  const match = computeSkillMatch(raw, profile);
   const visaInfo = detectVisaSponsorship(raw);
   const swedishInfo = detectSwedishRequirement(raw);
 
@@ -407,7 +528,7 @@ export function enrichJobWithMatch(raw: RawJobPosting): JobMatchItem {
     highlights:
       highlights.length > 0
         ? highlights
-        : ['Full-stack product engineering with modern TypeScript & cloud stack.'],
+        : ['Product engineering role with modern tech stack.'],
     match,
   };
 }
